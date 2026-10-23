@@ -43,14 +43,10 @@ app.use(scenariosRouter);
 // GitHub webhook: called by GitHub servers, no browser cookie — signature-verified instead.
 app.use(webhookRouter);
 
-// Everything below requires a signed-in session. This guarantees no
-// unauthenticated visitor can reach Studio/GitHub/user-data routes, and no
-// user can touch another user's tokens or repos (sessions are keyed per user).
-app.use(requireSession);
+// GitHub webhook: called by GitHub servers, no browser cookie — signature-verified instead.
+app.use(webhookRouter);
 
-app.use(githubRouter);
-
-// production: serve the exported frontend + SPA fallback
+// production: serve the exported frontend + static assets (no session needed).
 if (existsSync(FRONTEND_OUT)) {
   app.use(express.static(FRONTEND_OUT));
   app.get(/^\/(?!api\/).*/, (_req, res) => {
@@ -58,6 +54,11 @@ if (existsSync(FRONTEND_OUT)) {
   });
   console.log(`[docdrift] serving frontend from ${FRONTEND_OUT}`);
 }
+
+// Everything below requires a signed-in session (Studio/GitHub/user-data API routes).
+app.use(requireSession);
+
+app.use(githubRouter);
 
 app.use(
   (

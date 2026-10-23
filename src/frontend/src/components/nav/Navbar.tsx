@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion, useMotionValueEvent, useScroll } from "framer-motion";
+import { motion, useMotionValueEvent, useScroll } from "framer-motion";
 import { useState } from "react";
 import { Menu, X, Github, ArrowUpRight } from "lucide-react";
 import { GlyphMark } from "@/components/loader/Preloader";
@@ -88,44 +88,32 @@ export function Navbar() {
         </div>
       </motion.header>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, clipPath: "inset(0 0 100% 0)" }}
-            animate={{ opacity: 1, clipPath: "inset(0 0 0% 0)" }}
-            exit={{ opacity: 0, clipPath: "inset(0 0 100% 0)" }}
-            transition={{ duration: 0.45, ease: [0.76, 0, 0.24, 1] }}
-            className="fixed inset-0 z-[74] flex flex-col justify-center bg-ink-950/95 px-8 backdrop-blur-xl lg:hidden"
-          >
+      {open && (
+        <div
+          className="fixed inset-0 z-[74] flex flex-col justify-center bg-ink-950/95 px-8 backdrop-blur-xl lg:hidden animate-rise"
+        >
             <div className="flex flex-col gap-2">
-              {LINKS.map((l, i) => (
-                <motion.a
+              {LINKS.map((l) => (
+                <a
                   key={l.href}
                   href={l.href}
                   onClick={() => setOpen(false)}
-                  initial={{ opacity: 0, x: -28 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.08 + i * 0.06 }}
                   className="border-b border-line py-4 font-display text-3xl uppercase tracking-wide text-mist"
                 >
                   {l.label}
-                </motion.a>
+                </a>
               ))}
-              <motion.a
+              <a
                 href="/signin"
                 onClick={() => setOpen(false)}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.42 }}
                 className="mt-6 flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-drift-ember to-drift-amber px-6 py-4 font-semibold text-ink-950"
               >
                 <Github className="h-5 w-5" /> Sign in with GitHub
                 <ArrowUpRight className="h-5 w-5" />
-              </motion.a>
+              </a>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
     </>
   );
 }

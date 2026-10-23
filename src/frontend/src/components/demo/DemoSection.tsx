@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import {
   Play,
@@ -416,14 +415,11 @@ export function DemoSection() {
               </div>
             </Reveal>
 
-            <AnimatePresence>
-              {phase === "done" && result && (
+            {phase === "done" && result && (
                 <>
-                  <motion.div
+                  <div
                     key="summary"
-                    initial={{ opacity: 0, y: 24 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-wrap items-center gap-2.5 px-1"
+                    className="animate-rise flex flex-wrap items-center gap-2.5 px-1"
                   >
                     <Chip
                       label={`${result.symbols.length} symbols extracted`}
@@ -449,22 +445,19 @@ export function DemoSection() {
                       label={`${result.totalMs}ms total`}
                       cls="border-line text-fog"
                     />
-                  </motion.div>
+                  </div>
 
-                  <motion.div
+                  <div
                     key="drifts"
-                    initial={{ opacity: 0, y: 24 }}
-                    animate={{ opacity: 1, y: 0 }}
+                    className="animate-rise"
                   >
                     <PanelTitle title="findings" />
                     <DriftList drifts={result.drifts} />
-                  </motion.div>
+                  </div>
 
-                  <motion.div
+                  <div
                     key="patch"
-                    initial={{ opacity: 0, y: 24 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-col gap-4"
+                    className="animate-rise flex flex-col gap-4"
                   >
                     <PanelTitle
                       title="patch"
@@ -489,10 +482,9 @@ export function DemoSection() {
                         {result.patch.prBody}
                       </pre>
                     </div>
-                  </motion.div>
+                  </div>
                 </>
               )}
-            </AnimatePresence>
           </div>
         </div>
       </div>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { motion } from "framer-motion";
 import { Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 
@@ -69,20 +68,14 @@ export function DiffView({ diff }: { diff: string }) {
                         ? "text-mist font-semibold"
                         : "text-fog/85";
               return (
-                <motion.tr
-                  key={i}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: Math.min(i * 0.008, 0.5) }}
-                  className={cls}
-                >
+                <tr key={i} className={cls}>
                   <td className="w-8 select-none px-2 text-right align-top text-[10px] text-fog/30">
                     {i + 1}
                   </td>
                   <td className="whitespace-pre-wrap break-all px-3 align-top">
                     {line || "\u00A0"}
                   </td>
-                </motion.tr>
+                </tr>
               );
             })}
           </tbody>

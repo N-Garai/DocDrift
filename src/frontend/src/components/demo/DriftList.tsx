@@ -31,12 +31,10 @@ export function DriftList({ drifts }: { drifts: DriftFinding[] }) {
   return (
     <div className="flex flex-col gap-3">
       {drifts.map((d, i) => (
-        <motion.article
+        <article
           key={d.id}
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: i * 0.09, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-          className="glass rounded-2xl p-4.5 p-5"
+          className="animate-rise glass rounded-2xl p-4.5 p-5"
+          style={{ animationDelay: `${i * 90}ms` }}
         >
           <div className="flex flex-wrap items-center gap-2.5">
             <span
@@ -99,7 +97,7 @@ export function DriftList({ drifts }: { drifts: DriftFinding[] }) {
               validators: {d.validatorNotes}
             </p>
           )}
-        </motion.article>
+        </article>
       ))}
     </div>
   );

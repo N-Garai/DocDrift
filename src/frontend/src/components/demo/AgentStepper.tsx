@@ -1,6 +1,5 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle2, Loader2, MinusCircle, CircleDashed } from "lucide-react";
 import type { StepTrace, StepStatus } from "@/lib/api";
 
@@ -17,14 +16,11 @@ export function AgentStepper({
 
   return (
     <ol className="flex flex-col gap-2.5" aria-label="Agent workflow steps" aria-live="polite">
-      <AnimatePresence initial={false}>
-        {shown.map((s, idx) => (
-          <motion.li
+      {shown.map((s, idx) => (
+          <li
             key={s.id + idx}
-            initial={{ opacity: 0, x: -18 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className="glass flex items-start gap-3.5 rounded-xl px-4 py-3"
+            className="animate-rise glass flex items-start gap-3.5 rounded-xl px-4 py-3"
+            style={{ animationDelay: `${idx * 60}ms` }}
           >
             <StatusIcon status={s.status} spinning={running && idx === shown.length - 1} />
             <div className="min-w-0 flex-1">
@@ -38,19 +34,16 @@ export function AgentStepper({
                 {s.notes}
               </p>
             </div>
-          </motion.li>
+          </li>
         ))}
-      </AnimatePresence>
 
       {running && visibleCount >= steps.length && (
-        <motion.li
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="flex items-center gap-3.5 rounded-xl px-4 py-3 font-mono text-[12px] text-drift-ember"
+        <li
+          className="animate-rise flex items-center gap-3.5 rounded-xl px-4 py-3 font-mono text-[12px] text-drift-ember"
         >
           <Loader2 className="h-4 w-4 animate-spin" />
           awaiting engine response …
-        </motion.li>
+        </li>
       )}
     </ol>
   );

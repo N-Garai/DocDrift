@@ -237,6 +237,55 @@ body {
   to { --beam-angle: 360deg; }
 }
 
+/* ───────────────────────── scroll-reveal engine ─────────────────────────── *
+ * Vanilla IntersectionObserver + CSS — see components/fx/Reveal.tsx.
+ * No JS-dependency traps: SSR renders `hidden`, CSS throttles to transition,
+ * and a fail-safe timer in JS guarantees `shown` (no blank sections ever). */
+.rv {
+  transition-property: opacity, transform, filter, clip-path;
+  transition-duration: var(--rv-dur, 0.75s);
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--rv-delay, 0s);
+  will-change: opacity, transform;
+}
+.rv[data-rv="hidden"] {
+  opacity: 0;
+  transform: translate3d(var(--rv-x, 0px), var(--rv-y, 0px), 0)
+    scale(var(--rv-sc, 1));
+  filter: blur(var(--rv-bl, 0px));
+  clip-path: var(--rv-cl, none);
+}
+.rv[data-rv="shown"] {
+  opacity: 1;
+  transform: none;
+  filter: blur(0px);
+  clip-path: var(--rv-cl-done, none);
+}
+@media (prefers-reduced-motion: reduce) {
+  .rv,
+  .rv[data-rv="hidden"] {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+    clip-path: none !important;
+  }
+}
+
+/* later-mounted blocks (demo results, findings) — simple CSS rise-in */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-rise {
+  animation: rise-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 /* noise texture overlay */
 .noise-overlay {
   position: fixed;

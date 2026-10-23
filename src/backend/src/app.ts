@@ -49,7 +49,15 @@ app.use(webhookRouter);
 // production: serve the exported frontend + static assets (no session needed).
 if (existsSync(FRONTEND_OUT)) {
   app.use(express.static(FRONTEND_OUT));
+  // Catch-all: try the route-specific HTML first (Next.js export generates
+  // out/signin.html for /signin), then fall back to index.html so client-side
+  // Next.js routing can render the correct page for any URL.
   app.get(/^\/(?!api\/).*/, (_req, res) => {
+    const target = path.join(FRONTEND_OUT, _req.path.replace(/\/$/, "") + ".html");
+    if (existsSync(target)) {
+      res.sendFile(target);
+      return;
+    }
     res.sendFile(path.join(FRONTEND_OUT, "index.html"));
   });
   console.log(`[docdrift] serving frontend from ${FRONTEND_OUT}`);

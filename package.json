@@ -1,0 +1,23 @@
+{
+  "name": "docdrift",
+  "version": "1.2.0",
+  "private": true,
+  "description": "DocDrift — background codebase-to-documentation synchronizer powered by open-source AI (Mastra + Gemma + tree-sitter)",
+  "license": "MIT",
+  "workspaces": [
+    "src/frontend",
+    "src/backend"
+  ],
+  "scripts": {
+    "dev": "cd src/frontend && bun run dev",
+    "dev:frontend": "cd src/frontend && bun run dev",
+    "dev:backend": "cd src/backend && bun run dev",
+    "lint": "cd src/frontend && bun run lint",
+    "build": "cd src/frontend && bun run build",
+    "start": "cd src/backend && bun run start",
+    "test": "cd src/backend && bun run test"
+  },
+  "engines": {
+    "node": ">=20.6.0"
+  }
+}

@@ -1,0 +1,42 @@
+# DocDrift — docker compose
+#
+#   docker compose up -d                          # engine + UI (deterministic AI)
+#   docker compose --profile local-ai up -d       # + Ollama for local Gemma
+#   docker compose exec ollama ollama pull gemma3:4b
+#
+# The web service serves the exported frontend AND the API on port 3000.
+
+services:
+  web:
+    build: .
+    image: docdrift:latest
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: "3000"
+      # AI providers — all optional, resolved in order: ollama → gemini → heuristic
+      OLLAMA_URL: ${OLLAMA_URL:-}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma3:4b}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemma-4-31b-it}
+      CORS_ORIGIN: ${CORS_ORIGIN:-}
+      # GitHub login (Studio) — free OAuth App, see docs/SELF_HOSTING.md §6b
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      # Deployment origin: OAuth callback + keep-warm self-ping target
+      APP_BASE_URL: ${APP_BASE_URL:-}
+      KEEP_WARM: ${KEEP_WARM:-on}
+    restart: unless-stopped
+
+  # Optional: local open-weight Gemma via Ollama (fully offline inference).
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["local-ai"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  ollama:

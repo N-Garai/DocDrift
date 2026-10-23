@@ -1,0 +1,37 @@
+# Render blueprint — deploy DocDrift with the GitHub login + keep-warm stack.
+#
+# Deploy: Render → New → Blueprint → point at this repo.
+# The free plan sleeps after ~15 idle minutes; the engine ships a keep-warm
+# self-ping (every 13.5 min, see src/backend/src/keepwarm.ts) that keeps it
+# awake as long as APP_BASE_URL/RENDER_EXTERNAL_URL is resolvable.
+# Set KEEP_WARM=off if you upgrade to a plan that never sleeps.
+
+services:
+  - type: web
+    name: docdrift
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Render injects RENDER_EXTERNAL_URL automatically; the engine uses it
+      # for the OAuth callback and the keep-warm self-ping. Set APP_BASE_URL
+      # explicitly only if you serve DocDrift behind your own domain.
+      - key: APP_BASE_URL
+        sync: false
+      # GitHub OAuth App (free): https://github.com/settings/developers
+      # callback URL: https://<your-service>.onrender.com/api/auth/github/callback
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      # Optional hosted Gemma (free tier key from Google AI Studio)
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: OLLAMA_MODEL
+        sync: false
+      - key: KEEP_WARM
+        value: "on"

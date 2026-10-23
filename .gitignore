@@ -1,0 +1,47 @@
+# local
+node_modules
+**/node_modules
+.next
+**/.next
+out
+**/out
+dist
+**/dist
+*.tsbuildinfo
+dev.log
+server.log
+.vercel
+
+# environment
+.env
+.env.local
+.env*.local
+
+# persistence (holds user OAuth tokens — never commit)
+data/
+**/data/
+docdrift-store.json
+
+
+# platform
+
+.db
+db
+prisma
+examples
+mini-services
+skills
+upload
+download
+tests
+dev.log
+Caddyfile
+.verify
+
+# misc
+.DS_Store
+*.pem
+npm-debug.log*
+
+# other
+roadmap/

@@ -1,0 +1,29 @@
+{
+  "name": "@docdrift/backend",
+  "version": "1.1.0",
+  "private": true,
+  "type": "module",
+  "description": "DocDrift engine — tree-sitter AST extraction, Mastra agent workflow, Gemma drift synthesis",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "test": "node --import tsx --test ../../test/backend/*.test.ts"
+  },
+  "dependencies": {
+    "@mastra/core": "^1.79.0",
+    "@repomix/tree-sitter-wasms": "^0.1.17",
+    "@sentry/node": "^11.8.0",
+    "cors": "^2.8.5",
+    "express": "^5.3.0",
+    "web-tree-sitter": "^0.27.1",
+    "zod": "^4.0.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}

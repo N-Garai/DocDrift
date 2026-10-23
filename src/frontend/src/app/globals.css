@@ -1,0 +1,259 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* ─────────────────────────  DocDrift design tokens  ─────────────────────────
+ * "Ember terminal" identity — warm graphite ink, signal ember, mint verify,
+ * coral drift. Deliberately NOT the cyan/violet gradient every AI ships.
+ * ──────────────────────────────────────────────────────────────────────────── */
+@theme {
+  --font-display: var(--font-bricolage), "Georgia", serif;
+  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
+
+  /* warm graphite ink scale */
+  --color-ink-950: #080706;
+  --color-ink-900: #0c0a09;
+  --color-ink-800: #141210;
+  --color-ink-700: #1d1916;
+  --color-ink-600: #26211c;
+
+  /* signal palette */
+  --color-drift-ember: #ff5a1f;
+  --color-drift-amber: #ffb03a;
+  --color-drift-mint: #2ee59d;
+  --color-drift-coral: #ff6b5e;
+  --color-mist: #f0ede7;
+  --color-fog: #a39d92;
+
+  --animate-marquee: marquee 30s linear infinite;
+  --animate-marquee-rev: marquee-rev 36s linear infinite;
+  --animate-float-slow: float-y 7s ease-in-out infinite;
+  --animate-float-slower: float-y 10s ease-in-out infinite;
+  --animate-gradient-x: gradient-x 7s ease infinite;
+  --animate-blink: blink 1.15s steps(2, start) infinite;
+  --animate-spin-slower: spin 16s linear infinite;
+  --animate-pulse-dot: pulse-dot 1.6s ease-in-out infinite;
+  --animate-drift-x: drift-x 22s ease-in-out infinite alternate;
+  --animate-scan-slow: scan-slow 17s linear infinite;
+  --animate-dash-flow: dash-flow 3.2s linear infinite;
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes marquee-rev {
+  from { transform: translateX(-50%); }
+  to { transform: translateX(0); }
+}
+@keyframes float-y {
+  0%, 100% { transform: translateY(-9px); }
+  50% { transform: translateY(11px); }
+}
+@keyframes gradient-x {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+@keyframes blink {
+  50% { opacity: 0; }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(46, 229, 157, 0.5); }
+  50% { opacity: 0.75; box-shadow: 0 0 0 6px rgba(46, 229, 157, 0); }
+}
+/* a diff line slowly drifting sideways — the brand motion */
+@keyframes drift-x {
+  from { transform: translateX(-28px); }
+  to { transform: translateX(28px); }
+}
+@keyframes scan-slow {
+  0% { transform: translateY(-12vh); opacity: 0; }
+  8% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { transform: translateY(112vh); opacity: 0; }
+}
+@keyframes dash-flow {
+  to { stroke-dashoffset: -28; }
+}
+
+/* ─────────────────────────  shadcn token bridge (dark-only)  ───────────────────────── */
+:root {
+  --background: #080706;
+  --foreground: #f0ede7;
+  --card: #141210;
+  --card-foreground: #f0ede7;
+  --popover: #141210;
+  --popover-foreground: #f0ede7;
+  --primary: #ff5a1f;
+  --primary-foreground: #080706;
+  --secondary: #1d1916;
+  --secondary-foreground: #f0ede7;
+  --muted: #1d1916;
+  --muted-foreground: #a39d92;
+  --accent: #26211c;
+  --accent-foreground: #f0ede7;
+  --destructive: #ff6b5e;
+  --destructive-foreground: #ffffff;
+  --border: rgba(214, 208, 197, 0.13);
+  --input: rgba(214, 208, 197, 0.2);
+  --ring: rgba(255, 90, 31, 0.5);
+  --radius: 0.75rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* ─────────────────────────  base  ───────────────────────── */
+html {
+  scroll-behavior: smooth;
+  overflow-x: clip;
+}
+
+body {
+  background: var(--background);
+  color: var(--color-mist, #f0ede7);
+  overflow-x: clip;
+}
+
+::selection {
+  background: rgba(255, 90, 31, 0.3);
+  color: #ffffff;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #0c0a09;
+}
+::-webkit-scrollbar-thumb {
+  background: #26211c;
+  border-radius: 8px;
+  border: 2px solid #0c0a09;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3a322b;
+}
+
+/* ─────────────────────────  custom utilities  ───────────────────────── */
+@utility text-stroke {
+  -webkit-text-stroke: 1.5px rgba(240, 237, 231, 0.28);
+  color: transparent;
+}
+
+@utility glass {
+  background: linear-gradient(160deg, rgba(29, 25, 22, 0.55), rgba(12, 10, 9, 0.78));
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(214, 208, 197, 0.12);
+}
+
+@utility grid-overlay {
+  background-image:
+    linear-gradient(rgba(163, 157, 146, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(163, 157, 146, 0.055) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, black 25%, transparent 78%);
+}
+
+@utility dot-grid {
+  background-image: radial-gradient(rgba(240, 237, 231, 0.06) 1px, transparent 1.4px);
+  background-size: 26px 26px;
+}
+
+@utility gradient-anim {
+  background-size: 220% 220%;
+  animation: gradient-x 7s ease infinite;
+}
+
+@utility card-beam {
+  position: relative;
+  overflow: hidden;
+}
+
+@utility scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #26211c transparent;
+}
+
+/* rotating conic border beam for feature cards */
+.card-beam::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--beam-angle, 0deg),
+    transparent 0deg,
+    rgba(255, 90, 31, 0.55) 60deg,
+    rgba(255, 176, 58, 0.45) 120deg,
+    transparent 180deg,
+    transparent 360deg
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  pointer-events: none;
+}
+
+.card-beam:hover::before {
+  opacity: 1;
+  animation: beam-spin 3.2s linear infinite;
+}
+
+@property --beam-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes beam-spin {
+  to { --beam-angle: 360deg; }
+}
+
+/* noise texture overlay */
+.noise-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

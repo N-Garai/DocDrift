@@ -198,7 +198,7 @@ export function DemoSection() {
   }
 
   return (
-    <section id="demo" className="relative z-10 scroll-mt-24 py-24 sm:py-32">
+    <section id="demo" className="relative z-10 scroll-mt-24 py-16 sm:py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <SectionHeading
           eyebrow="live demo"

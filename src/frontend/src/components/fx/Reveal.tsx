@@ -43,7 +43,7 @@ export function Reveal({
   if (reduced) return <div className={className}>{children}</div>;
 
   const offset = OFFSETS[variant];
-  const hidden: Record<string, unknown> = {
+  const hidden: any = {
     opacity: 0,
     x: offset.x ?? 0,
     y: offset.y ?? 0,
@@ -58,7 +58,7 @@ export function Reveal({
     hidden.clipPath = "inset(0 0 100% 0)";
   }
 
-  const shown: Record<string, unknown> = {
+  const shown: any = {
     opacity: 1,
     x: 0,
     y: 0,
@@ -71,8 +71,7 @@ export function Reveal({
     <motion.div
       className={className}
       initial={hidden}
-      whileInView={shown}
-      viewport={{ once, amount }}
+      animate={shown}
       transition={{ duration, delay, ease: [0.22, 1, 0.36, 1] }}
     >
       {children}
@@ -96,8 +95,7 @@ export function Stagger({
     <motion.div
       className={className}
       initial="hidden"
-      whileInView="shown"
-      viewport={{ once: true, amount }}
+      animate="shown"
       variants={{
         hidden: {},
         shown: { transition: { staggerChildren: gap } },

@@ -41,7 +41,7 @@ export function Footer() {
         aria-hidden
         className="h-px w-full bg-gradient-to-r from-transparent via-drift-ember/50 to-transparent"
       />
-      <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6">
+      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
         <div className="grid gap-10 md:grid-cols-[1.2fr_2fr]">
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-2.5">

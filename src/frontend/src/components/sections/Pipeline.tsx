@@ -118,7 +118,7 @@ export function Pipeline() {
   const lineScale = useSpring(scrollYProgress, { stiffness: 90, damping: 24 });
 
   return (
-    <section id="pipeline" className="relative z-10 scroll-mt-24 py-16 sm:py-24">
+    <section id="pipeline" className="relative z-10 scroll-mt-24 py-12 sm:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <SectionHeading
           eyebrow="the agent crew"

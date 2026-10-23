@@ -23,7 +23,7 @@ const MARQUEE_A = [
 export function Hero() {
   const d = heroDelay;
   return (
-    <section id="top" className="relative overflow-hidden pt-28 sm:pt-36">
+    <section id="top" className="relative overflow-hidden pt-20 sm:pt-28">
       <HeroCanvas className="absolute inset-0 h-full w-full opacity-70" />
 
       <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6">
@@ -121,7 +121,7 @@ export function Hero() {
         </div>
       </div>
 
-      <div className="relative z-10 mt-12 border-y border-line bg-ink-900/40 backdrop-blur-sm sm:mt-14">
+      <div className="relative z-10 mt-8 border-y border-line bg-ink-900/40 backdrop-blur-sm sm:mt-10">
         <Marquee items={MARQUEE_A} />
       </div>
     </section>

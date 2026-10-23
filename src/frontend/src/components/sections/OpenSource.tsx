@@ -39,7 +39,7 @@ export function OpenSource() {
   }, []);
 
   return (
-    <section id="open" className="relative z-10 scroll-mt-24 py-16 sm:py-24">
+    <section id="open" className="relative z-10 scroll-mt-24 py-12 sm:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <SectionHeading
           eyebrow="why open matters"

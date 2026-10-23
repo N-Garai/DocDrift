@@ -5,7 +5,7 @@ import { Terminal, BookOpen } from "lucide-react";
 
 export function CTA() {
   return (
-    <section className="relative z-10 overflow-hidden py-20 sm:py-28">
+    <section className="relative z-10 overflow-hidden py-16 sm:py-20">
       <div
         aria-hidden
         className="pointer-events-none absolute left-1/2 top-1/2 h-[420px] w-[720px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-drift-amber/[0.07] blur-[120px]"

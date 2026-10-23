@@ -13,7 +13,7 @@ const STATS = [
 
 export function Stats() {
   return (
-    <section className="relative z-10 py-14 sm:py-16">
+    <section className="relative z-10 py-10 sm:py-14">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <Stagger className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4" gap={0.1}>
           {STATS.map((s) => (

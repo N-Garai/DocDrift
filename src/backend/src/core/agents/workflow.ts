@@ -361,9 +361,10 @@ const gate1 = createStep({
           findings: ctx.drifts,
           symbols: ctx.symbols,
         });
-        const dropped = verdicts.filter((v) => !v.ok).length;
-        const kept = verdicts.filter((v) => v.ok);
-        agentNote = `${verdicts.length} findings checked by ValidatorAgent · ${dropped} dropped as ungrounded`;
+        const verdictList = verdicts.verdicts;
+        const dropped = verdictList.filter((v) => !v.ok).length;
+        const kept = verdictList.filter((v) => v.ok);
+        agentNote = `${verdictList.length} findings checked by ValidatorAgent · ${dropped} dropped as ungrounded`;
         // Drop findings the agent rejected
         const keptIds = new Set(kept.map((v) => v.id));
         ctx.drifts = ctx.drifts.filter((d) => keptIds.has(d.id));
@@ -446,9 +447,10 @@ const gate2 = createStep({
           edits: ctx.edits,
           docContents,
         });
-        const rejected = patchVerdicts.filter((v) => !v.ok).length;
-        const acceptedIds = new Set(patchVerdicts.filter((v) => v.ok).map((v) => v.driftId));
-        agentNote = `${patchVerdicts.length} edits checked by PatchAgent · ${rejected} rejected`;
+        const patchList = patchVerdicts.accepted;
+        const rejected = patchList.filter((v) => !v.ok).length;
+        const acceptedIds = new Set(patchList.filter((v) => v.ok).map((v) => v.driftId));
+        agentNote = `${patchList.length} edits checked by PatchAgent · ${rejected} rejected`;
         // Drop edits the agent rejected
         ctx.edits = ctx.edits.filter((e) => acceptedIds.has(e.driftId));
       } catch (err) {

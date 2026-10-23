@@ -166,3 +166,8 @@ export function tokenForRepo(owner: string, repo: string): string | null {
   const s = sessionForRepo(owner, repo);
   return s ? s.token : null;
 }
+
+/** Alias of getSession, used by the webhook handler (no cookie context). */
+export function getStoredSession(id: string): StoredSession | null {
+  return getSession(id);
+}

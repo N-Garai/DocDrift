@@ -48,7 +48,7 @@ function verifySignature(
 
 /* ── GitHub API helpers (run with the repo-owning user's token) ─────────── */
 
-async function ghFetch(token: string, url: string, init?: RequestInit): Promise<Response> {
+async function ghFetch(token: string, url: string, init?: RequestInit): Promise<globalThis.Response> {
   return fetch(url, {
     ...init,
     headers: { ...ghApiHeaders(token), ...(init?.headers ?? {}) },

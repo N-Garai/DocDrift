@@ -291,12 +291,14 @@ export function ghApiHeaders(token: string): Record<string, string> {
 /**
  * Express middleware: require a signed-in session.
  * Unauthenticated requests get 401. Apply to every Studio / user-data route.
+ * Can also be called directly to get the token: `requireSession(req, res)` returns
+ * the token string or null if no session.
  */
 export function requireSession(
   req: Request,
   res: Response,
-  next: (err?: any) => void
-): void {
+  next?: (err?: any) => void
+): string | null | void {
   const session = getSession(req);
   if (!session) {
     res.status(401).json({
@@ -304,8 +306,13 @@ export function requireSession(
       error: "not signed in",
       hint: "Start the flow at /api/auth/github/login",
     });
-    return;
+    if (next) return; // don't call next() after sending a response
+    return null;
   }
   (req as any).session = session;
-  next();
+  if (next) {
+    next();
+    return;
+  }
+  return session.token;
 }

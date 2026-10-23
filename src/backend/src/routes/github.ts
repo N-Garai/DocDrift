@@ -24,17 +24,8 @@ import {
 
 export const githubRouter = Router();
 
-function requireSession(req: Request, res: Response): string | null {
-  const session = getSession(req);
-  if (!session) {
-    res.status(401).json({
-      ok: false,
-      error: "not signed in",
-      hint: "Start the flow at /api/auth/github/login",
-    });
-    return null;
-  }
-  return session.token;
+function encodePath(path: string): string {
+  return path.split("/").map(encodeURIComponent).join("/");
 }
 
 /* ── shared GitHub API helper (exported for the webhook routes) ──────────── */
@@ -129,7 +120,7 @@ githubRouter.get("/api/github/repos", async (req, res) => {
 githubRouter.get("/api/github/repo/:owner/:repo/branches", async (req, res) => {
   const token = requireSession(req, res);
   if (!token) return;
-  const { owner, repo } = req.params;
+  const { owner, repo } = req.params as { owner: string; repo: string };
   try {
     const branches = await ghJson<Array<{ name: string; commit: { sha: string } }>>(
       token,
@@ -150,7 +141,7 @@ githubRouter.get("/api/github/repo/:owner/:repo/branches", async (req, res) => {
 githubRouter.get("/api/github/repo/:owner/:repo/tree", async (req, res) => {
   const token = requireSession(req, res);
   if (!token) return;
-  const { owner, repo } = req.params;
+  const { owner, repo } = req.params as { owner: string; repo: string };
   const ref = typeof req.query.ref === "string" && req.query.ref ? req.query.ref : "HEAD";
   try {
     const tree = await ghJson<{
@@ -179,7 +170,7 @@ githubRouter.get("/api/github/repo/:owner/:repo/tree", async (req, res) => {
 githubRouter.get("/api/github/repo/:owner/:repo/blob", async (req, res) => {
   const token = requireSession(req, res);
   if (!token) return;
-  const { owner, repo } = req.params;
+  const { owner, repo } = req.params as { owner: string; repo: string };
   const path = typeof req.query.path === "string" ? req.query.path : "";
   const ref = typeof req.query.ref === "string" && req.query.ref ? req.query.ref : "HEAD";
   if (!path || path.includes("..")) {
@@ -234,7 +225,7 @@ githubRouter.post(
   async (req: Request, res: Response) => {
     const session = (req as any).session as { token: string; user: { login: string } };
     const token = session.token;
-    const { owner, repo } = req.params;
+    const { owner, repo } = req.params as { owner: string; repo: string };
     const parsed = webhookSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({
@@ -251,8 +242,8 @@ githubRouter.post(
     const origin = config.baseUrl
       ? config.baseUrl
       : (() => {
-          const proto = (req.get("x-forwarded-proto") ?? req.protocol).split(",")[0].trim();
-          const host = req.get("x-forwarded-host") ?? req.get("host") ?? "";
+          const proto = ((req.get("x-forwarded-proto") as string) ?? req.protocol).split(",")[0].trim();
+          const host = (req.get("x-forwarded-host") as string) ?? (req.get("host") as string) ?? "";
           return host ? `${proto}://${host}` : "";
         })();
 
@@ -331,7 +322,7 @@ githubRouter.delete(
   async (req: Request, res: Response) => {
     const session = (req as any).session as { token: string };
     const token = session.token;
-    const { owner, repo } = req.params;
+    const { owner, repo } = req.params as { owner: string; repo: string };
 
     const wh = getWebhook(owner, repo);
     if (wh) {
@@ -340,8 +331,8 @@ githubRouter.delete(
       const origin = config.baseUrl
         ? config.baseUrl
         : (() => {
-            const proto = (req.get("x-forwarded-proto") ?? req.protocol).split(",")[0].trim();
-            const host = req.get("x-forwarded-host") ?? req.get("host") ?? "";
+            const proto = ((req.get("x-forwarded-proto") as string) ?? req.protocol).split(",")[0].trim();
+            const host = (req.get("x-forwarded-host") as string) ?? (req.get("host") as string) ?? "";
             return host ? `${proto}://${host}` : "";
           })();
       const callbackUrl = `${origin}/api/github/webhook`;
@@ -392,7 +383,7 @@ const prSchema = z.object({
 githubRouter.post("/api/github/repo/:owner/:repo/pr", async (req, res) => {
   const token = requireSession(req, res);
   if (!token) return;
-  const { owner, repo } = req.params;
+  const { owner, repo } = req.params as { owner: string; repo: string };
 
   const parsed = prSchema.safeParse(req.body);
   if (!parsed.success) {

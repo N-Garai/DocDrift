@@ -23,7 +23,30 @@ import { geminiGenerate } from "../llm/gemini.js";
 import { extractJson, SYNTH_SYSTEM, TONE_SYSTEM, synthPrompt, tonePrompt } from "../llm/prompts.js";
 import type { CodeSymbol, DriftFinding, DocEdit } from "../types.js";
 
-/* ── provider wrapper used by every agent ─────────────────────────────────── */
+/* ── system prompt strings (Mastra Agent has no runtime .instructions property) ── */
+
+const EXTRACTION_SYSTEM = `You are the Extraction Agent inside DocDrift. Your job is to read source code
+(TypeScript, JavaScript, Python) and extract the public surface: exported functions,
+classes, interfaces, type aliases, constants, fields, routes, and env keys.
+Return only what is actually present in the code — do not infer or hallucinate symbols.
+Every symbol must carry its file path and line number for evidence.`;
+
+const VALIDATOR_SYSTEM = `You are the Code-Side Validator Agent inside DocDrift. Gate 1.
+You receive a list of drift findings and the code symbols extracted from the AST.
+For each finding, decide if the code side truly supports it. Mark a finding as not ok
+if it references a symbol not present in the symbols list, or if the evidence does not
+match. Be strict: phantom links and naming-based assumptions are dropped.`;
+
+const PATCH_SYSTEM = `You are the Docs-Side Validator Agent inside DocDrift. Gate 2.
+You receive proposed documentation edits (old text → new text at a line number)
+and the current document content. Decide if each edit applies cleanly without
+breaking markdown tables, corrupting structure, or creating invalid markdown.
+Reject edits that cannot be applied cleanly.`;
+
+const TONE_SYSTEM_LOCAL = `You are the Tone Agent inside DocDrift. You rewrite pull-request titles and bodies
+so they read like a concise, friendly senior engineer wrote them. Rules: plain verbs, no
+exclamation marks, no emojis, no LLM-isms ("delve", "seamless", "supercharge"). Keep all
+factual details, file names and numbers exactly. Respond with STRICT JSON only.`;
 
 async function callGemma(
   system: string,
@@ -99,7 +122,7 @@ export async function runExtractionAgent(input: ExtractionInput): Promise<Extrac
   });
 
   const text = await callGemma(
-    extractionAgent.instructions as string,
+    EXTRACTION_SYSTEM,
     `Extract the public symbols from this code file and return the JSON object:\n${payload}`
   );
 
@@ -168,7 +191,7 @@ export async function runValidatorAgent(input: ValidationInput): Promise<Validat
   });
 
   const text = await callGemma(
-    validatorAgent.instructions as string,
+    VALIDATOR_SYSTEM,
     `Validate these drift findings against the code symbols. Return the verdicts JSON:\n${payload}`
   );
 
@@ -235,7 +258,7 @@ export async function runPatchAgent(input: PatchValidationInput): Promise<PatchV
   });
 
   const text = await callGemma(
-    patchAgent.instructions as string,
+    PATCH_SYSTEM,
     `Validate these doc edits against the document contents. Return the accepted JSON:\n${payload}`
   );
 
@@ -286,7 +309,7 @@ const toneOutputSchema = z.object({
 
 export async function runToneAgent(input: ToneInput): Promise<ToneOutput> {
   const text = await callGemma(
-    toneAgent.instructions as string,
+    TONE_SYSTEM_LOCAL,
     tonePrompt(input.title, input.body)
   );
 

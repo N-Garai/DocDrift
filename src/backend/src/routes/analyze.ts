@@ -34,6 +34,7 @@ analyzeRouter.post("/api/analyze", async (req, res) => {
       scenarioId: null,
       language: body.language,
       codeFile: body.custom.codeFile,
+      extraCodeFiles: body.custom.extraCodeFiles,
       docs: body.custom.docs,
       envExample: body.custom.envExample,
     };

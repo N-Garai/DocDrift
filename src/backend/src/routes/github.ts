@@ -7,6 +7,7 @@
  *
  *   GET  /api/github/repos                    → repos the user owns/collabs on
  *   GET  /api/github/repo/:owner/:repo/branches
+ *   GET  /api/github/repo/:owner/:repo/commits?sha=&limit=  → recent commits + touched files
  *   GET  /api/github/repo/:owner/:repo/tree?ref=
  *   GET  /api/github/repo/:owner/:repo/blob?path=&ref=   (raw file content)
  *   POST /api/github/repo/:owner/:repo/pr     → branch + commit docs + open PR
@@ -127,6 +128,77 @@ githubRouter.get("/api/github/repo/:owner/:repo/branches", async (req, res) => {
       `https://api.github.com/repos/${owner}/${repo}/branches?per_page=50`
     );
     res.json({ ok: true, branches: branches.map((b) => b.name) });
+  } catch (err) {
+    const e = err as Error & { status?: number };
+    res.status(e.status && e.status >= 400 && e.status < 500 ? e.status : 502).json({
+      ok: false,
+      error: e.message,
+    });
+  }
+});
+
+/* ── recent commits with their touched files (incremental drift checks) ──── */
+/*
+ * The studio remembers the commit it last analyzed per repo+branch. On the
+ * next run it only needs the commits landed since then — this returns the
+ * latest N commits plus, for each, the files it touched, in ONE response
+ * (the frontend never has to walk history commit-by-commit).
+ */
+
+export interface CommitFileInfo {
+  filename: string;
+  status: string;
+}
+
+export interface CommitSummary {
+  sha: string;
+  shortSha: string;
+  message: string;
+  date: string;
+  files: CommitFileInfo[];
+}
+
+githubRouter.get("/api/github/repo/:owner/:repo/commits", async (req, res) => {
+  const token = requireSession(req, res);
+  if (!token) return;
+  const { owner, repo } = req.params as { owner: string; repo: string };
+  const sha = typeof req.query.sha === "string" && req.query.sha ? req.query.sha : "HEAD";
+  const rawLimit = Number(req.query.limit);
+  const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 1), 20) : 10;
+
+  try {
+    const commits = await ghJson<
+      Array<{ sha: string; commit: { message: string; author?: { date?: string } } }>
+    >(
+      token,
+      `https://api.github.com/repos/${owner}/${repo}/commits?sha=${encodeURIComponent(sha)}&per_page=${limit}`
+    );
+
+    // Each commit's changed-file list comes from its detail endpoint — fetch
+    // them in bounded parallel so one bad commit cannot wedge the request.
+    const summaries: CommitSummary[] = await Promise.all(
+      commits.map(async (c) => {
+        let files: CommitFileInfo[] = [];
+        try {
+          const detail = await ghJson<{ files?: Array<{ filename: string; status: string }> }>(
+            token,
+            `https://api.github.com/repos/${owner}/${repo}/commits/${c.sha}`
+          );
+          files = (detail.files ?? []).slice(0, 200).map((f) => ({ filename: f.filename, status: f.status }));
+        } catch {
+          // Leave the file list empty — the caller treats it as "unknown".
+        }
+        return {
+          sha: c.sha,
+          shortSha: c.sha.slice(0, 7),
+          message: (c.commit.message ?? "").split("\n")[0].slice(0, 140),
+          date: c.commit.author?.date ?? "",
+          files,
+        };
+      })
+    );
+
+    res.json({ ok: true, branch: sha === "HEAD" ? null : sha, head: summaries[0]?.sha ?? null, commits: summaries });
   } catch (err) {
     const e = err as Error & { status?: number };
     res.status(e.status && e.status >= 400 && e.status < 500 ? e.status : 502).json({

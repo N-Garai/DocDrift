@@ -143,6 +143,8 @@ export interface AnalyzeRequest {
   language?: "typescript" | "python";
   custom?: {
     codeFile: { path: string; content: string };
+    /** Repo-context code files (docs-referenced modules) analyzed alongside. */
+    extraCodeFiles?: { path: string; content: string }[];
     docs: { path: string; content: string }[];
     envExample?: { path: string; content: string };
   };

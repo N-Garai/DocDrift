@@ -31,9 +31,10 @@ export function runValidationGates(
   drifts: DriftFinding[],
   edits: DocEdit[]
 ): GateResult {
-  const codeLines = input.codeFile.content.split("\n");
-  const codeLineSet = new Map<number, string>();
-  codeLines.forEach((l, i) => codeLineSet.set(i + 1, l));
+  // Symbol index lives across the primary code file and every extra context
+  // file — ground evidence in the exact file the finding names.
+  const codeFiles = [input.codeFile, ...(input.extraCodeFiles ?? [])];
+  const codeLinesByFile = new Map(codeFiles.map((f) => [f.path, f.content.split("\n")]));
 
   /* ── gate 1: code grounding ─────────────────────────────────────────── */
   let checked = 0;
@@ -42,7 +43,8 @@ export function runValidationGates(
 
   for (const d of drifts) {
     checked++;
-    const line = codeLineSet.get(d.codeEvidence.line);
+    const evidenceFileLines = codeLinesByFile.get(d.codeEvidence.file);
+    const line = evidenceFileLines?.[d.codeEvidence.line - 1];
     const token = primaryToken(d.symbol);
 
     let groundedOk = true;
@@ -62,6 +64,9 @@ export function runValidationGates(
         groundedOk = false;
         notes.push("stale-reference finding has no verifiable docs line");
       }
+    } else if (!evidenceFileLines) {
+      groundedOk = false;
+      notes.push(`code file ${d.codeEvidence.file} is not in the analyzed set`);
     } else if (!line) {
       groundedOk = false;
       notes.push(`code line ${d.codeEvidence.line} does not exist`);
@@ -103,7 +108,7 @@ export function runValidationGates(
   let failed = 0;
 
   for (const e of edits) {
-    const file = [...input.docs, input.codeFile].find((f) => f.path === e.file);
+    const file = [...input.docs, ...codeFiles].find((f) => f.path === e.file);
     if (!file) {
       failed++;
       continue;

@@ -22,14 +22,17 @@ import {
   fetchBranches,
   fetchTree,
   fetchBlob,
+  fetchCommits,
   openDocsPr,
   curateCodeFiles,
   curateDocFiles,
+  findDocReferencedCode,
   langForPath,
   applyEdits,
   ApiError,
   type RepoInfo,
   type TreeFile,
+  type CommitSummary,
 } from "@/lib/github";
 import type { AnalyzeResult } from "@/lib/api";
 import { DriftList } from "@/components/demo/DriftList";
@@ -37,6 +40,34 @@ import { DiffView } from "@/components/demo/DiffView";
 
 type Stage = "repo" | "files" | "results";
 type RunState = "idle" | "running" | "done" | "error";
+
+function lastShaKey(fullName: string, branch: string): string {
+  return `docdrift:lastSha:${fullName}:${branch}`;
+}
+
+function computeIncremental(
+  fullName: string,
+  branch: string,
+  commits: CommitSummary[]
+): { newCommits: number; touchedPaths: Set<string>; headSha: string | null; lastSha: string | null } {
+  const headSha = commits[0]?.sha ?? null;
+  let lastSha: string | null = null;
+  try {
+    lastSha = localStorage.getItem(lastShaKey(fullName, branch));
+  } catch {
+    lastSha = null;
+  }
+  if (!lastSha) return { newCommits: 0, touchedPaths: new Set(), headSha, lastSha: null };
+  const idx = commits.findIndex((c) => c.sha.startsWith(lastSha));
+  if (idx === -1) return { newCommits: -1, touchedPaths: new Set(), headSha, lastSha };
+  const since = commits.slice(0, idx);
+  return {
+    newCommits: since.length,
+    touchedPaths: new Set(since.flatMap((c) => c.files.map((f) => f.filename))),
+    headSha,
+    lastSha,
+  };
+}
 
 const RUN_STEPS = [
   "intake — reading git-side inputs",
@@ -79,6 +110,19 @@ export function Workspace({ login }: { login: string }) {
   /* pr */
   const [prBusy, setPrBusy] = useState(false);
   const [prUrl, setPrUrl] = useState<string | null>(null);
+  const [prModal, setPrModal] = useState(false);
+  const [branches, setBranches] = useState<string[]>([]);
+  const [prBase, setPrBase] = useState("");
+  const [prBranchName, setPrBranchName] = useState("");
+
+  /* incremental checks + the nature of the run just executed */
+  const [incremental, setIncremental] = useState<{
+    newCommits: number;
+    touchedPaths: Set<string>;
+    headSha: string | null;
+    lastSha: string | null;
+  } | null>(null);
+  const [ranIncrementalCommits, setRanIncrementalCommits] = useState<number | null>(null);
 
   /* ── load repos once ─────────────────────────────────────────────────── */
   useEffect(() => {
@@ -110,13 +154,17 @@ export function Workspace({ login }: { login: string }) {
     setDocPaths([]);
     setStage("files");
     setTreeLoading(true);
+    setIncremental(null);
     try {
-      const [tree] = await Promise.all([
+      const [tree, br, commits] = await Promise.all([
         fetchTree(r.owner, r.name, r.defaultBranch),
         fetchBranches(r.owner, r.name).catch(() => ({ branches: [r.defaultBranch] })),
+        fetchCommits(r.owner, r.name, r.defaultBranch, 15).catch(() => ({ head: null, commits: [] })),
       ]);
+      setBranches(br.branches);
       setTreeFiles(tree.files);
       setTreeTruncated(tree.truncated);
+      setIncremental(computeIncremental(r.fullName, r.defaultBranch, commits.commits));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "could not read the repo tree");
       setTreeFiles([]);
@@ -125,10 +173,39 @@ export function Workspace({ login }: { login: string }) {
     }
   }
 
-  const codeOptions = useMemo(
-    () => (treeFiles ? curateCodeFiles(treeFiles) : []),
-    [treeFiles]
-  );
+  /* switch the branch the drift analysis runs against */
+  async function changeBranch(b: string) {
+    if (!repo || b === branch) return;
+    setBranch(b);
+    setTreeFiles(null);
+    setCodePath("");
+    setDocPaths([]);
+    setTreeLoading(true);
+    setIncremental(null);
+    try {
+      const [tree, commits] = await Promise.all([
+        fetchTree(repo.owner, repo.name, b),
+        fetchCommits(repo.owner, repo.name, b, 15).catch(() => ({ head: null, commits: [] })),
+      ]);
+      setTreeFiles(tree.files);
+      setTreeTruncated(tree.truncated);
+      setIncremental(computeIncremental(repo.fullName, b, commits.commits));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "could not read the repo tree");
+      setTreeFiles([]);
+    } finally {
+      setTreeLoading(false);
+    }
+  }
+
+  const codeOptions = useMemo(() => {
+    const base = treeFiles ? curateCodeFiles(treeFiles) : [];
+    // On an incremental check, files touched by commits since the last run
+    // surface first so the natural default selection hits fresh code.
+    if (!incremental || incremental.newCommits <= 0) return base;
+    const touched = base.filter((f) => incremental.touchedPaths.has(f.path));
+    return [...touched, ...base.filter((f) => !incremental.touchedPaths.has(f.path))];
+  }, [treeFiles, incremental]);
   const allCodeFiles = useMemo(
     () =>
       (treeFiles ?? []).filter(
@@ -179,6 +256,9 @@ export function Workspace({ login }: { login: string }) {
     setRunStep(0);
     setStage("results");
     setPrUrl(null);
+    setRanIncrementalCommits(
+      incremental && incremental.newCommits > 0 ? incremental.newCommits : null
+    );
     contentsRef.current = new Map();
     const stepper = setInterval(
       () => setRunStep((i) => Math.min(RUN_STEPS.length - 1, i + 1)),
@@ -209,18 +289,53 @@ export function Workspace({ login }: { login: string }) {
       const docsClean = docs.filter((d) => d.path !== envExamplePath);
       if (docsClean.length === 0) throw new Error("no markdown docs selected");
 
+      // Repo-context pass: give the engine every code file the docs mention
+      // (best effort — anything unavailable is skipped, never fatal).
+      let extraCodeFiles: { path: string; content: string }[] | undefined;
+      try {
+        const referenced = findDocReferencedCode(
+          docsClean,
+          treeFiles ?? [],
+          [codePath, ...docPaths],
+          8
+        );
+        const blobs = await Promise.all(
+          referenced.map((p) =>
+            fetchBlob(repo.owner, repo.name, p, ref)
+              .then((b) => {
+                contentsRef.current.set(b.path, b.content);
+                return { path: b.path, content: b.content };
+              })
+              .catch(() => null)
+          )
+        );
+        const ok = blobs.filter((b): b is { path: string; content: string } => b !== null);
+        if (ok.length > 0) extraCodeFiles = ok;
+      } catch {
+        // context fetch is best-effort
+      }
+
       const { analyze } = await import("@/lib/api");
       const res = await analyze({
         mode: "custom",
         language: langForPath(codePath),
         custom: {
           codeFile: { path: codePath, content: codeBlob.content },
+          extraCodeFiles,
           docs: docsClean,
           envExample,
         },
       });
       setResult(res);
       setRunState("done");
+      // record the analyzed commit so the next run can be incremental
+      if (incremental?.headSha) {
+        try {
+          localStorage.setItem(lastShaKey(repo.fullName, ref), incremental.headSha);
+        } catch {
+          // storage unavailable — next run simply re-analyzes everything
+        }
+      }
       toast.success(
         `${res.drifts.length} drift${res.drifts.length === 1 ? "" : "s"} found · engine: ${res.engine.engine}`
       );
@@ -232,8 +347,10 @@ export function Workspace({ login }: { login: string }) {
     }
   }
 
-  /* ── open the docs PR on GitHub ──────────────────────────────────────── */
-  async function createPr() {
+  /* ── open the docs PR on GitHub (after the user picks from/to + confirms) ─ */
+  const BRANCH_RE = /^[^~^:?*[\s\\]+$/;
+
+  async function createPr(base: string, newBranch: string) {
     if (!repo || !result) return;
     setPrBusy(true);
     try {
@@ -250,17 +367,19 @@ export function Workspace({ login }: { login: string }) {
       });
       if (files.length === 0) throw new Error("the patch contains no applicable edits");
 
-      const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");
       const res = await openDocsPr(repo.owner, repo.name, {
-        base: branch || repo.defaultBranch,
-        branch: `docdrift/docs-sync-${stamp}`,
+        base,
+        branch: newBranch,
         title: result.patch.prTitle,
         body: result.patch.prBody,
         files,
       });
       setPrUrl(res.pullRequest.html_url);
+      setPrModal(false);
       toast.success(
-        res.created ? `Pull request #${res.pullRequest.number} opened` : "A PR already exists for this branch"
+        res.created
+          ? `Pull request #${res.pullRequest.number} opened — review it on GitHub`
+          : "A PR already exists for this branch — opened it for you"
       );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "could not open the pull request");
@@ -302,7 +421,8 @@ export function Workspace({ login }: { login: string }) {
           <li className="ml-auto flex items-center gap-2 text-fog">
             <GitBranch className="h-3.5 w-3.5 text-drift-amber" />
             <span className="text-mist">{repo.fullName}</span>
-            <span className="text-fog/50">@{login}</span>
+            <span className="text-fog/50">@{branch || repo.defaultBranch}</span>
+            <span className="text-fog/50">· {login}</span>
           </li>
         )}
       </ol>
@@ -368,12 +488,58 @@ export function Workspace({ login }: { login: string }) {
         </section>
       )}
 
-      {/* ── stage 2: files ──────────────────────────────────────────────── */}
-      {stage === "files" && (
+      {/* ── stage 2: files ──────────────────────────────────────────────── */}      {stage === "files" && (
         <section className="grid gap-5 lg:grid-cols-2">
+          {/* branch + incremental status */}
+          <div className="glass flex flex-wrap items-center gap-3 rounded-3xl px-5 py-3.5 lg:col-span-2">
+            <GitBranch className="h-4 w-4 shrink-0 text-drift-amber" />
+            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-fog/60">
+              analyze on branch
+            </span>
+            <select
+              value={branch}
+              onChange={(e) => changeBranch(e.target.value)}
+              className="rounded-xl border border-line bg-ink-900 px-3 py-2 font-mono text-[12px] text-mist outline-none transition-colors focus:border-drift-ember/50"
+            >
+              {(branches.includes(branch)
+                ? [branch, ...branches.filter((b) => b !== branch)]
+                : [branch,
+                    ...branches]
+              )
+                .slice(0, 50)
+                .map((b) => (
+                  <option key={b} value={b}>
+                    {b}
+                  </option>
+                ))}
+            </select>
+            {treeLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-drift-ember" />}
+            {incremental && !treeLoading && (
+              <span
+                className={`ml-auto font-mono text-[10.5px] leading-relaxed ${
+                  incremental.lastSha === null
+                    ? "text-fog/60"
+                    : incremental.newCommits === -1
+                      ? "text-[#f7d77f]"
+                      : "text-drift-mint"
+                }`}
+              >
+                {incremental.lastSha === null
+                  ? "first check on this branch — full analysis"
+                  : incremental.newCommits === -1
+                    ? `${incremental.lastSha.slice(0, 7)} is older than the fetched window — running a full pass`
+                    : incremental.newCommits === 0
+                      ? `up to date with ${incremental.lastSha.slice(0, 7)} — no new commits since your last check`
+                      : `${incremental.newCommits} new commit${incremental.newCommits === 1 ? "" : "s"} since ${incremental.lastSha.slice(0, 7)} — changed code files surface first`}
+              </span>
+            )}
+          </div>
+
           {/* code side */}
           <div className="glass rounded-3xl p-6">
             <div className="flex items-center justify-between gap-3">
+
+
               <h3 className="flex items-center gap-2.5 font-display text-base uppercase tracking-wide text-mist">
                 <FileCode2 className="h-4.5 w-4.5 text-drift-ember" /> code side
               </h3>
@@ -594,6 +760,12 @@ export function Workspace({ login }: { login: string }) {
                   {result.totalMs} ms · {result.symbols.length} symbols ·{" "}
                   {result.docTargets.length} doc targets
                 </span>
+                {ranIncrementalCommits !== null && (
+                  <span className="rounded-full border border-drift-mint/30 bg-drift-mint/[0.06] px-3 py-1 font-mono text-[10.5px] uppercase tracking-[0.16em] text-drift-mint">
+                    incremental · {ranIncrementalCommits} new commit
+                    {ranIncrementalCommits === 1 ? "" : "s"} checked
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={() => setStage("files")}
@@ -622,6 +794,12 @@ export function Workspace({ login }: { login: string }) {
                       across {result.patch.filesChanged.length} file
                       {result.patch.filesChanged.length === 1 ? "" : "s"}
                     </p>
+                    {result.patch.edits.length === 0 && (
+                      <p className="mt-1 font-mono text-[11px] text-drift-amber">
+                        no auto-applicable edits were drafted — these findings need a
+                        human writer before a PR makes sense.
+                      </p>
+                    )}
                   </div>
                   {prUrl ? (
                     <a
@@ -635,7 +813,13 @@ export function Workspace({ login }: { login: string }) {
                   ) : (
                     <button
                       type="button"
-                      onClick={createPr}
+                      onClick={() => {
+                        setPrBase(branch || repo.defaultBranch);
+                        setPrBranchName(
+                          `docdrift/docs-sync-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")}`
+                        );
+                        setPrModal(true);
+                      }}
                       disabled={prBusy || result.patch.edits.length === 0}
                       className="inline-flex items-center gap-2.5 rounded-2xl bg-gradient-to-r from-drift-mint to-drift-ember px-6 py-3 text-sm font-semibold text-ink-950 transition-transform hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-40"
                     >
@@ -649,11 +833,114 @@ export function Workspace({ login }: { login: string }) {
                   )}
                 </div>
                 <p className="mt-4 font-mono text-[11px] leading-relaxed text-fog/70">
-                  the PR is opened as <span className="text-mist">@{login}</span> from a
-                  new <span className="text-mist">docdrift/docs-sync-…</span> branch —
-                  nothing is merged automatically; you review, you merge.
+                  the PR is opened as <span className="text-mist">@{login}</span> — you
+                  pick the target branch and the working branch, confirm, and only then
+                  anything ships. nothing is merged automatically; you review, you merge.
                 </p>
               </div>
+
+              {/* ── PR confirmation modal: from-branch, to-branch, verify ────── */}
+              {prModal && (
+                <div
+                  className="fixed inset-0 z-[90] flex items-center justify-center bg-ink-950/80 p-4 backdrop-blur-sm"
+                  role="dialog"
+                  aria-modal="true"
+                >
+                  <div className="glass w-full max-w-md rounded-3xl p-6">
+                    <h3 className="flex items-center gap-2.5 font-display text-base uppercase tracking-wide text-mist">
+                      <GitPullRequest className="h-5 w-5 text-drift-mint" />
+                      verify &amp; open the docs PR
+                    </h3>
+
+                    <div className="mt-5 flex flex-col gap-4">
+                      <label className="block">
+                        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-fog/60">
+                          into — the PR target (base)
+                        </span>
+                        <select
+                          value={prBase}
+                          onChange={(e) => setPrBase(e.target.value)}
+                          className="mt-1.5 w-full rounded-xl border border-line bg-ink-900 px-3 py-2.5 font-mono text-[12.5px] text-mist outline-none transition-colors focus:border-drift-ember/50"
+                        >
+                          {(branches.includes(prBase) || branches.length === 0
+                            ? [prBase, ...branches.filter((b) => b !== prBase)]
+                            : [branch || repo.defaultBranch, ...branches]
+                          )
+                            .slice(0, 50)
+                            .map((b) => (
+                              <option key={b} value={b}>
+                                {b}
+                              </option>
+                            ))}
+                        </select>
+                        <span className="mt-1 block font-mono text-[10px] text-fog/50">
+                          analysis ran on {branch || repo.defaultBranch} — the edits
+                          always apply to the docs as they exist on that branch.
+                        </span>
+                      </label>
+
+                      <label className="block">
+                        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-fog/60">
+                          from — the new working branch
+                        </span>
+                        <input
+                          value={prBranchName}
+                          onChange={(e) => setPrBranchName(e.target.value)}
+                          spellCheck={false}
+                          className="mt-1.5 w-full rounded-xl border border-line bg-ink-900 px-3 py-2.5 font-mono text-[12.5px] text-mist outline-none transition-colors focus:border-drift-ember/50"
+                        />
+                        <span
+                          className={`mt-1 block font-mono text-[10px] ${
+                            BRANCH_RE.test(prBranchName.trim())
+                              ? "text-fog/50"
+                              : "text-[#f7d77f]"
+                          }`}
+                        >
+                          {BRANCH_RE.test(prBranchName.trim())
+                            ? `a new branch is created from ${prBase} holding the doc edits`
+                            : "branch name contains invalid characters"}
+                        </span>
+                      </label>
+                    </div>
+
+                    <p className="mt-4 rounded-xl border border-line bg-ink-900/60 px-3 py-2.5 font-mono text-[11.5px] leading-relaxed text-fog">
+                      {result.patch.edits.length} edits → {result.patch.filesChanged.join(", ")}
+                      <span className="ml-1.5 text-drift-mint">
+                        +{result.patch.additions}
+                      </span>{" "}
+                      <span className="text-[#ff8fa3]">−{result.patch.deletions}</span>
+                    </p>
+
+                    <div className="mt-5 flex items-center justify-end gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setPrModal(false)}
+                        disabled={prBusy}
+                        className="rounded-xl border border-line px-4 py-2.5 text-sm text-fog transition-colors hover:text-mist disabled:opacity-40"
+                      >
+                        cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => createPr(prBase.trim(), prBranchName.trim())}
+                        disabled={
+                          prBusy ||
+                          prBase.trim() === prBranchName.trim() ||
+                          !BRANCH_RE.test(prBranchName.trim())
+                        }
+                        className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-drift-mint to-drift-ember px-5 py-2.5 text-sm font-semibold text-ink-950 transition-transform hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {prBusy ? (
+                          <Loader2 className="h-4.5 w-4.5 animate-spin" />
+                        ) : (
+                          <GitPullRequest className="h-4.5 w-4.5" />
+                        )}
+                        {prBusy ? "opening the PR…" : "open pull request"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </section>

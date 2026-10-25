@@ -120,6 +120,12 @@ export interface AnalyzeInput {
   scenarioId: string | null;
   language: "typescript" | "python";
   codeFile: SourceFile;
+  /**
+   * Additional code files that give the engine repo-wide context — files the
+   * docs reference, modules the primary file imports, etc. Their symbols join
+   * the same index; evidence always names the exact file it came from.
+   */
+  extraCodeFiles?: SourceFile[];
   docs: SourceFile[];
   envExample?: SourceFile;
 }
@@ -156,6 +162,7 @@ export const analyzeRequestSchema = z.discriminatedUnion("mode", [
     language: z.enum(["typescript", "python"]),
     custom: z.object({
       codeFile: sourceFileSchema,
+      extraCodeFiles: z.array(sourceFileSchema).max(10).optional(),
       docs: z.array(sourceFileSchema).min(1).max(6),
       envExample: sourceFileSchema.optional(),
     }),

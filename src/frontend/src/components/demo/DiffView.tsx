@@ -11,6 +11,7 @@ import { toast } from "sonner";
 export function DiffView({ diff }: { diff: string }) {
   const [copied, setCopied] = useState(false);
   const lines = useMemo(() => diff.split("\n"), [diff]);
+  const hasContent = diff.trim().length > 0;
 
   async function copy() {
     try {
@@ -27,24 +28,27 @@ export function DiffView({ diff }: { diff: string }) {
     <div className="glass overflow-hidden rounded-2xl">
       <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
         <p className="font-mono text-[11px] text-fog">suggested patch · unified diff</p>
-        <button
-          onClick={copy}
-          className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 font-mono text-[10.5px] uppercase tracking-[0.12em] text-fog transition-colors hover:border-drift-ember/40 hover:text-mist"
-          aria-label="Copy patch to clipboard"
-        >
-          {copied ? (
-            <>
-              <Check className="h-3.5 w-3.5 text-drift-mint" /> copied
-            </>
-          ) : (
-            <>
-              <Copy className="h-3.5 w-3.5" /> copy
-            </>
-          )}
-        </button>
+        {(hasContent ? (
+          <button
+            onClick={copy}
+            className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 font-mono text-[10.5px] uppercase tracking-[0.12em] text-fog transition-colors hover:border-drift-ember/40 hover:text-mist"
+            aria-label="Copy patch to clipboard"
+          >
+            {copied ? (
+              <>
+                <Check className="h-3.5 w-3.5 text-drift-mint" /> copied
+              </>
+            ) : (
+              <>
+                <Copy className="h-3.5 w-3.5" /> copy
+              </>
+            )}
+          </button>
+        ) : null)}
       </div>
 
-      <div className="scroll-thin max-h-[420px] overflow-auto">
+      {hasContent ? (
+        <div className="scroll-thin max-h-[420px] overflow-auto">
         <table className="w-full border-collapse font-mono text-[12px] leading-[1.7]">
           <tbody>
             {lines.map((line, i) => {
@@ -80,7 +84,12 @@ export function DiffView({ diff }: { diff: string }) {
             })}
           </tbody>
         </table>
-      </div>
+        </div>
+      ) : (
+        <p className="px-4 py-6 font-mono text-[11.5px] leading-relaxed text-fog/70">
+          no patch rendered — the engine drafted no direct edits for these findings.
+        </p>
+      )}
     </div>
   );
 }

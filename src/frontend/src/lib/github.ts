@@ -113,6 +113,66 @@ export interface PrFile {
   content: string;
 }
 
+export interface CommitFileInfo {
+  filename: string;
+  status: string;
+}
+
+export interface CommitSummary {
+  sha: string;
+  shortSha: string;
+  message: string;
+  date: string;
+  files: CommitFileInfo[];
+}
+
+export function fetchCommits(
+  owner: string,
+  repo: string,
+  ref: string,
+  limit = 10
+): Promise<{ head: string | null; commits: CommitSummary[] }> {
+  return json(
+    `/api/github/repo/${owner}/${repo}/commits?sha=${encodeURIComponent(ref)}&limit=${limit}`
+  );
+}
+
+/**
+ * Files the docs themselves reference — the engine's repo-context pick.
+ * Scans markdown/env content for backticked or linked paths of analyzed
+ * code types that exist in the tree, skipping files already selected.
+ */
+export function findDocReferencedCode(
+  docContents: { path: string; content: string }[],
+  treeFiles: TreeFile[],
+  exclude: string[],
+  max = 8
+): string[] {
+  const code = new Set(treeFiles.filter((f) => CODE_RE.test(f.path)).map((f) => f.path));
+  const skip = new Set(exclude);
+  const found: string[] = [];
+  const pathRe = /[\w./@~-]+\.(?:ts|tsx|py)\b/g;
+  for (const d of docContents) {
+    if (found.length >= max) break;
+    for (const m of d.content.matchAll(pathRe)) {
+      const candidate = m[0].replace(/^\.\//, "");
+      // anchor either at repo root or under any directory that matches a suffix
+      if (code.has(candidate) && !skip.has(candidate)) {
+        if (!found.includes(candidate)) found.push(candidate);
+        continue;
+      }
+      for (const p of code) {
+        if (p.endsWith(`/${candidate}`) && !skip.has(p)) {
+          if (!found.includes(p)) found.push(p);
+          break;
+        }
+      }
+    }
+    if (found.length >= max) break;
+  }
+  return found.slice(0, max);
+}
+
 export function openDocsPr(
   owner: string,
   repo: string,
@@ -181,17 +241,27 @@ export function applyEdits(
   const lines = content.split("\n");
   // apply from the bottom so earlier line numbers stay valid
   const sorted = [...edits].sort((a, b) => b.line - a.line);
+  // lines already inserted after a given origin line, so multiple inserts at
+  // the same position stack in finding order (not reversed)
+  const insertedAfter = new Map<number, number>();
   for (const e of sorted) {
     const idx = e.line - 1;
-    if (idx < 0 || idx >= lines.length) continue;
-    if (lines[idx].trim() !== e.oldText.trim().trim()) {
-      // engine evidence mismatch — try a local search around the line
-      const found = lines.findIndex((l) => l.trim() === e.oldText.trim());
-      if (found === -1) continue;
-      lines[found] = e.newText;
+    if (idx < 0 || idx > lines.length) continue;
+    const off = insertedAfter.get(idx) ?? 0;
+    if (e.oldText === "") {
+      const block = e.newText.split("\n");
+      if (block.length === 1 && (lines[idx + off] ?? "").trim() === block[0].trim()) continue;
+      lines.splice(idx + 1 + off, 0, ...block);
+      insertedAfter.set(idx, off + block.length);
       continue;
     }
-    lines[idx] = e.newText;
+    // verify the evidence matches what the engine saw — tolerate line drift
+    // by searching the whole file before giving up
+    const at = (lines[idx + off] ?? "").trim() === e.oldText.trim()
+      ? idx + off
+      : lines.findIndex((l) => l.trim() === e.oldText.trim());
+    if (at === -1) continue;
+    lines.splice(at, 1, ...e.newText.split("\n"));
   }
   return lines.join("\n");
 }

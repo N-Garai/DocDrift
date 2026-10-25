@@ -261,19 +261,22 @@ function lastNonEmptyLine(content: string): number {
 function applyEdits(oldLines: string[], edits: DocEdit[]): string[] {
   const out = [...oldLines];
   const sorted = [...edits].sort((a, b) => b.line - a.line); // bottom-up
+  // Number of content lines already inserted after a given origin line, so
+  // multiple inserts at the same position stack in finding order (not reversed).
+  const insertedAfter = new Map<number, number>();
   for (const e of sorted) {
     const idx = e.line - 1;
     if (idx < 0 || idx >= out.length) continue;
+    const off = insertedAfter.get(idx) ?? 0;
     if (e.oldText === "") {
       const insertLines = e.newText.split("\n");
       // if the edit replaces a trailing line (append semantics), skip duplicates
-      if (insertLines.length === 1 && out[idx].trim() === insertLines[0].trim()) continue;
-      out.splice(idx + 1, 0, ...insertLines);
-    } else if (out[idx].trim() === e.oldText.trim()) {
-      out.splice(idx, 1, ...e.newText.split("\n"));
+      if (insertLines.length === 1 && out[idx + off].trim() === insertLines[0].trim()) continue;
+      out.splice(idx + 1 + off, 0, ...insertLines);
+      insertedAfter.set(idx, off + insertLines.length);
     } else {
       // tolerate whitespace drift: replace regardless, keyed by line number
-      out.splice(idx, 1, ...e.newText.split("\n"));
+      out.splice(idx + off, 1, ...e.newText.split("\n"));
     }
   }
   return out;

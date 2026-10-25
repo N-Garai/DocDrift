@@ -116,14 +116,17 @@ const patchSchema = z.object({
   edits: z.array(editSchema),
 });
 
+const ctxInputShape = {
+  scenarioId: z.string().nullable(),
+  language: z.enum(["typescript", "python"]),
+  codeFile: sourceFile,
+  extraCodeFiles: z.array(sourceFile).max(10).optional(),
+  docs: z.array(sourceFile),
+  envExample: sourceFile.optional(),
+};
+
 const ctxSchema = z.object({
-  input: z.object({
-    scenarioId: z.string().nullable(),
-    language: z.enum(["typescript", "python"]),
-    codeFile: sourceFile,
-    docs: z.array(sourceFile),
-    envExample: sourceFile.optional(),
-  }),
+  input: z.object(ctxInputShape),
   engine: z.object({
     engine: z.enum(["gemma-ollama", "gemma-gemini", "heuristic"]),
     model: z.string().optional(),
@@ -162,13 +165,7 @@ function trace<T extends { steps: Ctx["steps"]; startedAt: number }>(
 /* ── steps ───────────────────────────────────────────────────────────────── */
 
 const intakeSchema = z.object({
-  input: z.object({
-    scenarioId: z.string().nullable(),
-    language: z.enum(["typescript", "python"]),
-    codeFile: sourceFile,
-    docs: z.array(sourceFile),
-    envExample: sourceFile.optional(),
-  }),
+  input: z.object(ctxInputShape),
   engine: z.object({
     engine: z.enum(["gemma-ollama", "gemma-gemini", "heuristic"]),
     model: z.string().optional(),
@@ -184,13 +181,14 @@ const intake = createStep({
   execute: async ({ inputData }) => {
     const t0 = Date.now();
     const { input, engine } = inputData;
+    const codeCount = 1 + (input.extraCodeFiles?.length ?? 0);
     const steps = trace(
       { steps: [], startedAt: t0 },
       "intake",
       "Intake — collect the changed tree",
       "intake",
       "ok",
-      `${input.scenarioId ? `scenario '${input.scenarioId}'` : "custom input"} · ${input.codeFile.path} + ${input.docs.length} doc file(s) · engine: ${engine.engine}`,
+      `${input.scenarioId ? `scenario '${input.scenarioId}'` : "custom input"} · ${input.codeFile.path}${codeCount > 1 ? ` + ${codeCount - 1} context file(s)` : ""} · ${input.docs.length} doc file(s) · engine: ${engine.engine}`,
       t0
     );
     return {
@@ -215,7 +213,11 @@ const extract = createStep({
   execute: async ({ inputData }) => {
     const t0 = Date.now();
     const ctx = inputData;
-    const res = await extractSymbols([ctx.input.codeFile], ctx.input.language);
+    // Build the symbol index across the primary file plus every extra code
+    // file (docs-referenced modules) — symbols carry their own file+line, so
+    // later steps can ground evidence per file.
+    const codeFiles = [ctx.input.codeFile, ...(ctx.input.extraCodeFiles ?? [])];
+    const res = await extractSymbols(codeFiles, ctx.input.language);
     const parser = res.parser === "tree-sitter" ? "tree-sitter" : "heuristic";
     const steps = trace(
       ctx,
@@ -223,7 +225,7 @@ const extract = createStep({
       "AST extractor — public surface",
       `extractor agent (${res.parser})`,
       res.parser === "tree-sitter" ? "ok" : "degraded",
-      `${res.symbols.length} symbols · ${res.notes}`,
+      `${res.symbols.length} symbols across ${codeFiles.length} file(s) · ${res.notes}`,
       t0
     );
     return {
@@ -274,6 +276,7 @@ const synthesize = createStep({
     const detection = detectDrift({
       language: ctx.input.language,
       codeFile: ctx.input.codeFile,
+      extraCodeFiles: ctx.input.extraCodeFiles,
       symbols: ctx.symbols,
       docs: ctx.input.docs,
     });
@@ -363,16 +366,28 @@ const gate1 = createStep({
         });
         const verdictList = verdicts.verdicts;
         const dropped = verdictList.filter((v) => !v.ok).length;
-        const kept = verdictList.filter((v) => v.ok);
         agentNote = `${verdictList.length} findings checked by ValidatorAgent · ${dropped} dropped as ungrounded`;
-        // Drop findings the agent rejected
-        const keptIds = new Set(kept.map((v) => v.id));
-        ctx.drifts = ctx.drifts.filter((d) => keptIds.has(d.id));
+        // Drop findings the agent explicitly rejected; findings with no verdict
+        // are kept — the deterministic gate below already grounded them.
+        const verdictById = new Map(verdictList.map((v) => [v.id, v]));
+        ctx.drifts = ctx.drifts.filter((d) => verdictById.get(d.id)?.ok !== false);
       } catch (err) {
         captureWorkflowError(err, { step: "gate-1" });
         agentNote = `ValidatorAgent unavailable — deterministic gate kept (${pre.report.codeGrounding.dropped} dropped)`;
       }
     }
+
+    // Merge the deterministic verdicts into the surviving findings. Rule
+    // findings always arrive with `verified: false`, and on the LLM path the
+    // filter above keeps those flags untouched — without this merge nothing is
+    // ever marked grounded, the patcher skips every finding and the PR is empty.
+    const preById = new Map(pre.drifts.map((d) => [d.id, d]));
+    ctx.drifts = ctx.drifts.map((d) => {
+      const g = preById.get(d.id);
+      return g
+        ? { ...d, verified: g.verified, validatorNotes: g.validatorNotes ?? d.validatorNotes }
+        : d;
+    });
 
     const finalDrifts = ctx.engine.engine !== "heuristic" ? ctx.drifts : pre.drifts;
     const steps = trace(
@@ -398,6 +413,7 @@ const patch = createStep({
     const detection = detectDrift({
       language: ctx.input.language,
       codeFile: ctx.input.codeFile,
+      extraCodeFiles: ctx.input.extraCodeFiles,
       symbols: ctx.symbols,
       docs: ctx.input.docs,
     });
@@ -449,10 +465,10 @@ const gate2 = createStep({
         });
         const patchList = patchVerdicts.accepted;
         const rejected = patchList.filter((v) => !v.ok).length;
-        const acceptedIds = new Set(patchList.filter((v) => v.ok).map((v) => v.driftId));
         agentNote = `${patchList.length} edits checked by PatchAgent · ${rejected} rejected`;
-        // Drop edits the agent rejected
-        ctx.edits = ctx.edits.filter((e) => acceptedIds.has(e.driftId));
+        // Drop edits the agent explicitly rejected; edits with no verdict stay.
+        const verdictById = new Map(patchList.map((v) => [v.driftId, v]));
+        ctx.edits = ctx.edits.filter((e) => verdictById.get(e.driftId)?.ok !== false);
       } catch (err) {
         captureWorkflowError(err, { step: "gate-2" });
         agentNote = `PatchAgent unavailable — deterministic gate kept (${gate.report.docsApply.failed} rejected)`;

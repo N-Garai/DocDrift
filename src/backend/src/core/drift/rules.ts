@@ -19,6 +19,7 @@ import { matchSymbolsToDocs, similarity, baseName } from "../match/matcher.js";
 export interface DriftDetectionInput {
   language: "typescript" | "python";
   codeFile: SourceFile;
+  extraCodeFiles?: SourceFile[];
   symbols: CodeSymbol[];
   docs: SourceFile[];
 }
@@ -71,6 +72,12 @@ function cleanHint(hint: string): string {
 
 export function detectDrift(input: DriftDetectionInput): DriftDetectionOutput {
   const { language, codeFile, symbols, docs } = input;
+  // Repo-wide context: every file in the symbol index, by path.
+  const filesMap = new Map(
+    [codeFile, ...(input.extraCodeFiles ?? [])].map((f) => [f.path, f.content])
+  );
+  const firstLineOf = (path: string): string =>
+    (filesMap.get(path)?.split("\n")[0] ?? "").slice(0, 160);
 
   /* parse docs side ─────────────────────────────────────────────────────── */
   const parses: DocsParseResult[] = [];
@@ -245,11 +252,14 @@ export function detectDrift(input: DriftDetectionInput): DriftDetectionOutput {
         severity: "major",
         symbol: routeLike[0],
         message: "this route path no longer exists in the code",
-        codeEvidence: {
-          file: codeFile.path,
-          line: symbols.find((s) => s.route)?.line ?? 1,
-          snippet: symbols.find((s) => s.route)?.signature ?? codeFile.content.split("\n")[0],
-        },
+        codeEvidence: (() => {
+          const routeSym = symbols.find((s) => s.route);
+          return {
+            file: routeSym?.file ?? codeFile.path,
+            line: routeSym?.line ?? 1,
+            snippet: routeSym?.signature ?? firstLineOf(routeSym?.file ?? codeFile.path),
+          };
+        })(),
         docEvidence: { file: t.file, line: t.line, snippet: t.text },
         suggestion: `Update or remove the stale route reference to ${routeLike[0]}.`,
         verified: false,

@@ -38,7 +38,7 @@ export function CTA() {
               Launch the Studio
             </a>
             <a
-              href="https://github.com/N-Garai/DocDrift"
+              href="https://raw.githubusercontent.com/N-Garai/DocDrift/refs/heads/main/docs/asset/architecture.png"
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-2.5 rounded-2xl border border-line bg-ink-800/50 px-8 py-4 text-base font-medium text-mist backdrop-blur transition-colors hover:border-drift-ember/40"

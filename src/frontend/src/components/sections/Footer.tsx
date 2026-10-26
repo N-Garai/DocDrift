@@ -88,7 +88,7 @@ export function Footer() {
             MIT licensed · no trackers · no cookies · no paid tiers
           </p>
           <p className="font-mono text-[11px] text-fog/60">
-            parsed with tree-sitter · orchestrated by mastra · prose by gemma
+            parsed · orchestrated · prose by model
           </p>
         </div>
       </div>

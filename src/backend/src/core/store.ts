@@ -4,11 +4,13 @@
  * Persists (across restarts):
  *   - sessions: id -> { token, user, scopes, expiresAt }
  *   - webhooks: "<owner>/<repo>" -> { owner, repo, secret, installedAt, sessionId }
+ *   - driftRuns: id -> { id, sessionId, repo, branch, codeFile, language, driftCount, createdAt, result }
  *
  * Why persistence matters here: GitHub push webhooks arrive from GitHub's
  * servers, independent of any browser session. The webhook handler must be
  * able to look up *which user owns a repo* and *their GitHub token* without
  * a cookie present. An in-memory Map would lose that on every restart.
+ * Drift runs are persisted so users can review past analyses after refresh.
  *
  * This is a zero-dependency store (no Neon/Postgres needed for the
  * hackathon scale). For production, swap the JSON backend for SQLite or
@@ -43,12 +45,25 @@ export interface StoredWebhook {
   sessionId: string;
 }
 
+export interface StoredRun {
+  id: string;
+  sessionId: string;
+  repo: string;
+  branch: string;
+  codeFile: string;
+  language: string;
+  driftCount: number;
+  createdAt: string;
+  result: any;
+}
+
 interface Store {
   sessions: Record<string, StoredSession>;
   webhooks: Record<string, StoredWebhook>;
+  driftRuns: Record<string, StoredRun>;
 }
 
-const EMPTY: Store = { sessions: {}, webhooks: {} };
+const EMPTY: Store = { sessions: {}, webhooks: {}, driftRuns: {} };
 
 let cache: Store | null = null;
 
@@ -68,6 +83,7 @@ function readStore(): Store {
     cache = JSON.parse(raw) as Store;
     cache.sessions = cache.sessions ?? {};
     cache.webhooks = cache.webhooks ?? {};
+    cache.driftRuns = cache.driftRuns ?? {};
     return cache;
   } catch {
     cache = { ...EMPTY };
@@ -170,4 +186,32 @@ export function tokenForRepo(owner: string, repo: string): string | null {
 /** Alias of getSession, used by the webhook handler (no cookie context). */
 export function getStoredSession(id: string): StoredSession | null {
   return getSession(id);
+}
+
+/* ── drift run history operations ─────────────────────────────────────────── */
+
+export function saveDriftRun(run: StoredRun): void {
+  const store = readStore();
+  store.driftRuns[run.id] = run;
+  writeStore(store);
+}
+
+export function listDriftRuns(sessionId?: string): StoredRun[] {
+  const runs = Object.values(readStore().driftRuns);
+  if (!sessionId) return runs.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return runs
+    .filter((r) => r.sessionId === sessionId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export function getDriftRun(id: string): StoredRun | null {
+  return readStore().driftRuns[id] ?? null;
+}
+
+export function deleteDriftRun(id: string): boolean {
+  const store = readStore();
+  if (!(id in store.driftRuns)) return false;
+  delete store.driftRuns[id];
+  writeStore(store);
+  return true;
 }

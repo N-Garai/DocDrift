@@ -21,6 +21,9 @@ import {
   deleteWebhook,
   getWebhook,
   listWebhooks,
+  saveDriftRun,
+  listDriftRuns,
+  getDriftRun,
 } from "../core/store.js";
 
 export const githubRouter = Router();
@@ -574,4 +577,41 @@ githubRouter.post("/api/github/repo/:owner/:repo/pr", async (req, res) => {
       error: e.message,
     });
   }
+});
+
+/* ── drift run history (session-scoped) ───────────────────────────────────── */
+
+githubRouter.get("/api/history", requireSession, (_req, res) => {
+  const session = (_req as any).session as { token: string; user: { login: string } } | null;
+  const sessionId = session ? session.user.login : "";
+  const runs = listDriftRuns(sessionId || undefined);
+  res.json({ ok: true, runs: runs.map((r) => ({ id: r.id, repo: r.repo, branch: r.branch, codeFile: r.codeFile, language: r.language, driftCount: r.driftCount, createdAt: r.createdAt })) });
+});
+
+githubRouter.get("/api/history/:id", requireSession, (req, res) => {
+  const run = getDriftRun((req.params as { id: string }).id);
+  if (!run) {
+    return res.status(404).json({ ok: false, error: "drift run not found" });
+  }
+  res.json({ ok: true, run });
+});
+
+githubRouter.post("/api/history", requireSession, async (req, res) => {
+  const session = (req as any).session as { token: string; user: { login: string } };
+  const { id, repo, branch, codeFile, language, driftCount, result } = req.body;
+  if (!id || !repo || !codeFile || !language || driftCount === undefined) {
+    return res.status(400).json({ ok: false, error: "missing required fields" });
+  }
+  saveDriftRun({
+    id,
+    sessionId: session.user.login,
+    repo,
+    branch,
+    codeFile,
+    language,
+    driftCount,
+    createdAt: new Date().toISOString(),
+    result,
+  });
+  res.json({ ok: true });
 });

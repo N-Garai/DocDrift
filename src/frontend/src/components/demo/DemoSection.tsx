@@ -92,7 +92,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export function DemoSection() {
   const [scenarios, setScenarios] = useState<ScenarioMeta[]>([]);
   const [selected, setSelected] = useState<string>("");
-  const [customLang, setCustomLang] = useState<"typescript" | "python">("typescript");
+  const [customLang, setCustomLang] = useState<string>("typescript");
   const [customCode, setCustomCode] = useState(CUSTOM_SAMPLE.typescript.code);
   const [customDocs, setCustomDocs] = useState(CUSTOM_SAMPLE.typescript.docs);
   const [customEnv, setCustomEnv] = useState(CUSTOM_SAMPLE.typescript.env);
@@ -361,7 +361,7 @@ export function DemoSection() {
                       <p className="text-[13px] text-mist">
                         {phase === "done" && result
                           ? `${result.engine.engine} · parser: ${result.engine.parser}`
-                          : "deterministic engine · tree-sitter when available"}
+                          : "deterministic engine · structural parsing when available"}
                       </p>
                     </div>
                   </div>

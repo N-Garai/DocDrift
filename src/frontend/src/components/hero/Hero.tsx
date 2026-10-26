@@ -10,10 +10,10 @@ import { FloatingCards } from "./FloatingCards";
 import { Marquee } from "./Marquee";
 
 const MARQUEE_A = [
-  "tree-sitter ast",
-  "mastra agent workflow",
-  "gemma open weights",
-  "ollama local inference",
+  "ast parsing",
+  "agent workflow",
+  "open weights",
+  "local inference",
   "zero cloud calls",
   "$0 forever",
   "unified diffs",

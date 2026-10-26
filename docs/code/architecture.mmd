@@ -1,0 +1,73 @@
+flowchart TD
+    %% DocDrift — system architecture. Every label here is checked against
+    %% src/backend/src and src/frontend/src. See docs/ARCHITECTURE.md.
+
+    subgraph BROWSER["Browser — Next.js 16 + Tailwind frontend"]
+        direction TB
+        DEMO["Home · Live Demo<br/>public POST /api/analyze<br/>(scenario fixture or custom paste)"]
+        SIGNIN["/signin — GitHub OAuth landing"]
+        STUDIO["/studio — Workspace<br/>repo + branch + file picker,<br/>drift report, PR modal, history"]
+    end
+
+    subgraph ENGINE["Express engine — dev :3001 (gateway proxy) — Docker / Render :3000,<br/>same process also serves the exported frontend"]
+        direction TB
+        PUB["Public routes<br/>GET /api/health · GET /api/scenarios · POST /api/analyze"]
+        OAUTH["GitHub OAuth — free OAuth App<br/>scope: repo read:user<br/>httpOnly dd_session cookie · 7-day TTL"]
+        GATE["requireSession middleware<br/>gates every other route"]
+        GH["Studio GitHub proxy — every call runs with the signed-in user's own token<br/>GET /api/github/repos · repo branches · commits · tree · blob<br/>POST / DELETE /api/github/repo/:owner/:repo/webhook<br/>POST /api/github/repo/:owner/:repo/pr · /api/history"]
+        WH["POST /api/github/webhook<br/>GitHub push events, HMAC-SHA256 verified<br/>resolves the repo owner's token from the store — no cookie"]
+        KEEPWARM["keep-warm — production only<br/>self-pings /api/health every 13.5 min"]
+
+        subgraph WF["Mastra workflow · doc-drift-sync — nine typed steps"]
+            direction TB
+            INTAKE["intake"] --> EXTRACT["extract — tree-sitter WASM<br/>TS · JS · Python, structural fallback"]
+            EXTRACT --> DOCS["docs — markdown tables, code spans,<br/>.env.example lines"]
+            DOCS --> SYNTH["synthesize — folding matcher + 8 deterministic drift rules,<br/>Gemma may add findings (phantom filter)"]
+            SYNTH --> GATE1["gate-1 — code-side grounding:<br/>unverified claims are excluded from patching"]
+            GATE1 --> PATCH["patch — verified findings become DocEdits"]
+            PATCH --> GATE2["gate-2 — apply to a docs snapshot, re-parse,<br/>reject edits that break markdown"]
+            GATE2 --> TONE["tone — PR title + body"]
+            TONE --> EMIT["emit — AnalyzeResult"]
+        end
+
+        subgraph CHAIN["Gemma provider chain — resolved per request, 15 s TTL cache"]
+            direction LR
+            P1["1 · Ollama — localhost:11434<br/>default model gemma3:4b"]
+            P2["2 · Gemini API free tier<br/>default gemma-4-31b-it"]
+            P3["3 · heuristic — deterministic engine,<br/>runs with zero network"]
+        end
+
+        LEDGER["parser-failure ledger — in-memory<br/>mirrored at GET /api/health"]
+    end
+
+    STORE[("JSON file store · data/docdrift-store.json<br/>sessions · webhook registrations · drift-run history")]
+    SENTRY["Sentry — optional, free tier<br/>tokens and session ids redacted"]
+    PR["GitHub — docs PR opened as the signed-in user<br/>branch docdrift/docs-sync-*<br/>human review and merge only — never automatic"]
+
+    DEMO --> PUB
+    SIGNIN --> OAUTH
+    STUDIO --> GATE --> GH
+    OAUTH --> STORE
+    GH --> STORE
+    WH --> STORE
+    PUB --> WF
+    WH --> WF
+    KEEPWARM -.-> PUB
+    SYNTH -. "only when a provider is live" .-> CHAIN
+    GATE1 -. "optional ValidatorAgent" .-> CHAIN
+    GATE2 -. "optional PatchAgent" .-> CHAIN
+    TONE -. "optional ToneAgent or template pass" .-> CHAIN
+    EXTRACT -. "grammar failures" .-> LEDGER
+    LEDGER -. "when SENTRY_DSN is set" .-> SENTRY
+    GH --> PR
+    WH --> PR
+
+    style BROWSER fill:#0d1117,stroke:#333,stroke-width:2px,color:#e6edf3
+    style ENGINE fill:#0d1117,stroke:#333,stroke-width:2px,color:#e6edf3
+    style WF fill:#161b22,stroke:#c9d1d9,stroke-width:1px,color:#e6edf3
+    style CHAIN fill:#161b22,stroke:#2ea043,stroke-width:1px,color:#e6edf3
+    style STORE fill:#161b22,stroke:#a371f7,stroke-width:1px,color:#e6edf3
+    style PR fill:#161b22,stroke:#2ea043,stroke-width:1px,color:#e6edf3
+    style SENTRY fill:#161b22,stroke:#f7d77f,stroke-width:1px,color:#e6edf3
+    style LEDGER fill:#161b22,stroke:#f7d77f,stroke-width:1px,color:#e6edf3
+    style KEEPWARM fill:#161b22,stroke:#f7d77f,stroke-width:1px,color:#e6edf3

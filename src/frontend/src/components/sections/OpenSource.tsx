@@ -11,17 +11,17 @@ const PILLARS = [
   {
     icon: Laptop,
     title: "Your code never leaves the machine",
-    body: "The default path runs Ollama on localhost — the AST, your README and the patch all stay on your disk. The deterministic engine doesn't even open a socket. Traceability research (2025) shows LLM link-detection is useful but imperfect; doing it locally means the only thing at risk of a mistake is a markdown table, not your IP.",
+    body: "The default path runs local inference on localhost — the AST, your README and the patch all stay on your disk. The deterministic engine doesn't even open a socket. Traceability research (2025) shows LLM link-detection is useful but imperfect; doing it locally means the only thing at risk of a mistake is a markdown table, not your IP.",
   },
   {
     icon: Coins,
     title: "Set it up once, pay nothing ever",
-    body: "Every component is free: Mastra (MIT), tree-sitter (MIT), Gemma (open weights), Ollama (MIT), Express (MIT). The optional Gemini API path uses the free tier with a key from AI Studio — no credit card, no trial clock. There is no paid plan to outgrow.",
+    body: "Every component is free under an open-source license. The optional hosted API path uses a free tier with a key — no credit card, no trial clock. There is no paid plan to outgrow.",
   },
   {
     icon: Replace,
     title: "Swap the brain, keep the body",
-    body: "The synthesizer is a provider chain, not a vendor: point OLLAMA_MODEL at any local Gemma, set GEMINI_API_KEY for the hosted open model, or run with neither and the deterministic comparator steps in. Changing how your agent behaves is a config edit, not a migration.",
+    body: "The synthesizer is a provider chain, not a vendor: point at any local model, set an API key for the hosted open model, or run with neither and the deterministic comparator steps in. Changing how your agent behaves is a config edit, not a migration.",
   },
 ];
 
@@ -81,14 +81,14 @@ export function OpenSource() {
 
             <div className="mt-7 grid gap-3 sm:grid-cols-3">
               <ProviderNode
-                name="ollama · local"
-                desc="gemma open weights on localhost:11434"
+                name="local model"
+                desc="open weights on localhost"
                 active={health?.providers.ollama ?? false}
                 primary
               />
               <ProviderNode
-                name="gemini api · free tier"
-                desc="hosted gemma open model, key from AI Studio"
+                name="hosted api · free tier"
+                desc="hosted open model, key from provider dashboard"
                 active={health?.providers.gemini ?? false}
               />
               <ProviderNode

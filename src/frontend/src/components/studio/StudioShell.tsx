@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import { fetchMe, logout, ApiError, type Me } from "@/lib/github";
 import { AuthGate } from "./AuthGate";
 import { Workspace } from "./Workspace";
+import { HistoryButton } from "./HistoryButton";
 
 /**
  * Studio orchestration: probe the session, route to the auth gate or the
@@ -96,6 +97,7 @@ export function StudioShell() {
         >
           sign out
         </button>
+        <HistoryButton me={me} />
       </div>
 
       <Workspace login={me.user!.login} />

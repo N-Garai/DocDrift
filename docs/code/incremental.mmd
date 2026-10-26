@@ -1,0 +1,51 @@
+flowchart TD
+    %% DocDrift — incremental drift checks in the Studio. Checked against
+    %% src/frontend/src/components/studio/Workspace.tsx (Storage-based cursor)
+    %% and src/backend/src/routes/github.ts (commits endpoint).
+
+    subgraph REPO["Git repository"]
+        C1["commit A<br/>head of the last analyzed run"]
+        C2["commit B"]
+        C3["commit C<br/>current HEAD"]
+        C1 --> C2 --> C3
+    end
+
+    subgraph STUDIO["Studio — browser side"]
+        LS[("localStorage<br/>key: docdrift:lastSha:owner/repo:branch<br/>SHA of the last analyzed head")]
+        COMP["on repo or branch pick — fetch 15 recent commits<br/>GET /api/github/repo/:owner/:repo/commits<br/>(server clamps the limit to 20, each commit<br/>carries its own touched-file list)"]
+        IDX["locate the stored SHA in the commit list<br/>by SHA-prefix match"]
+        CASE{"status of the stored SHA"}
+        FULL["SHA not set — first check on this branch —<br/>or SHA older than the fetched window:<br/>run a full pass"]
+        SINCE["commits newer than the stored SHA<br/>= N new commits (may be 0 — up to date)"]
+        TOUCH["union of the files those N commits touched"]
+        FIRST["touched code files surface first in the curated<br/>code list, so the default selection hits fresh code"]
+        HINT["no analysis is mechanically skipped — the cursor<br/>only informs the UI; the engine still analyzes the<br/>selected file set in full"]
+    end
+
+    subgraph ENGINE["Engine — every run"]
+        E1["the same nine Mastra steps,<br/>both validation gates included"]
+        E2["drift report · unified diff · PR text"]
+    end
+
+    SAVE["after a successful run — persist the HEAD SHA<br/>seen at selection time back into localStorage"]
+
+    REPO --> COMP
+    COMP --> IDX --> CASE
+    CASE -->|"SHA not set or older than the window"| FULL
+    CASE -->|"SHA found"| SINCE
+    SINCE --> TOUCH --> FIRST
+    FULL --> E1
+    FIRST --> E1
+    E1 --> E2
+    E2 --> SAVE --> LS
+    CASE -. "no analysis skipped" .-> HINT
+
+    NOTE["the server-side JSON store keeps sessions,<br/>webhook registrations and drift-run history —<br/>the incremental cursor lives only in the browser"]
+
+    style REPO fill:#161b22,stroke:#c9d1d9,stroke-width:1px,color:#e6edf3
+    style STUDIO fill:#161b22,stroke:#c9d1d9,stroke-width:1px,color:#e6edf3
+    style ENGINE fill:#161b22,stroke:#c9d1d9,stroke-width:1px,color:#e6edf3
+    style CASE fill:#161b22,stroke:#2ea043,stroke-width:1px,color:#e6edf3
+    style NOTE fill:#0d1117,stroke:#a371f7,stroke-width:1px,color:#e6edf3
+    style LS fill:#161b22,stroke:#a371f7,stroke-width:1px,color:#e6edf3
+    style HINT fill:#161b22,stroke:#f7d77f,stroke-width:1px,color:#e6edf3

@@ -37,6 +37,7 @@ import {
 import type { AnalyzeResult } from "@/lib/api";
 import { DriftList } from "@/components/demo/DriftList";
 import { DiffView } from "@/components/demo/DiffView";
+import { HistoryButton } from "./HistoryButton";
 
 type Stage = "repo" | "files" | "results";
 type RunState = "idle" | "running" | "done" | "error";
@@ -209,7 +210,9 @@ export function Workspace({ login }: { login: string }) {
   const allCodeFiles = useMemo(
     () =>
       (treeFiles ?? []).filter(
-        (f) => /\.(ts|tsx|py)$/.test(f.path) && !/(^|\/)(node_modules|dist|build|out|\.next|vendor|__pycache__|\.venv)(\/|$)/.test(f.path)
+        (f) =>
+          /\.(ts|tsx|js|jsx|py|java|c|cc|cpp|hpp|h|go|rs|rb|php|cs)$/i.test(f.path) &&
+          !/(^|\/)(node_modules|dist|build|out|\.next|vendor|__pycache__|\.venv)(\/|$)/.test(f.path)
       ),
     [treeFiles]
   );
@@ -328,6 +331,26 @@ export function Workspace({ login }: { login: string }) {
       });
       setResult(res);
       setRunState("done");
+      // persist the run to history
+      try {
+        const runId = `run-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+        await fetch("/api/history", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: runId,
+            repo: repo.fullName,
+            branch: ref,
+            codeFile: codePath,
+            language: langForPath(codePath),
+            driftCount: res.drifts.length,
+            result: res,
+          }),
+        });
+      } catch {
+        // history save is best-effort; never fail the run because of it
+      }
       // record the analyzed commit so the next run can be incremental
       if (incremental?.headSha) {
         try {

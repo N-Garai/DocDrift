@@ -118,7 +118,17 @@ export interface SourceFile {
 
 export interface AnalyzeInput {
   scenarioId: string | null;
-  language: "typescript" | "python";
+  language:
+    | "typescript"
+    | "python"
+    | "java"
+    | "c"
+    | "cpp"
+    | "go"
+    | "rust"
+    | "ruby"
+    | "php"
+    | "csharp";
   codeFile: SourceFile;
   /**
    * Additional code files that give the engine repo-wide context — files the
@@ -159,7 +169,7 @@ export const analyzeRequestSchema = z.discriminatedUnion("mode", [
   }),
   z.object({
     mode: z.literal("custom"),
-    language: z.enum(["typescript", "python"]),
+    language: z.enum(["typescript", "python", "java", "c", "cpp", "go", "rust", "ruby", "php", "csharp"]),
     custom: z.object({
       codeFile: sourceFileSchema,
       extraCodeFiles: z.array(sourceFileSchema).max(10).optional(),

@@ -140,7 +140,7 @@ export interface HealthInfo {
 export interface AnalyzeRequest {
   mode: "scenario" | "custom";
   scenarioId?: string;
-  language?: "typescript" | "python";
+  language?: string;
   custom?: {
     codeFile: { path: string; content: string };
     /** Repo-context code files (docs-referenced modules) analyzed alongside. */

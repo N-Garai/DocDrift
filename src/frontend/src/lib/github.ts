@@ -186,7 +186,7 @@ export function openDocsPr(
 
 /* ── file curation heuristics ─────────────────────────────────────────────── */
 
-const CODE_RE = /\.(ts|tsx|py)$/;
+const CODE_RE = /\.(ts|tsx|js|jsx|py|java|c|cc|cpp|hpp|h|go|rs|rb|php|cs)$/;
 const EXCLUDE_RE =
   /(^|\/)(node_modules|dist|build|out|\.next|coverage|vendor|__pycache__|\.venv|venv|tests?|__tests__|__mocks__)(\/|$)|\.d\.ts$|\.test\.|\.spec\.|_test\.py$/;
 const PRIORITY_RE =
@@ -228,9 +228,18 @@ export function curateDocFiles(files: TreeFile[]): TreeFile[] {
   return picked;
 }
 
-/** Language guess for the engine (typescript | python). */
-export function langForPath(path: string): "typescript" | "python" {
-  return path.endsWith(".py") ? "python" : "typescript";
+/** Language guess for the engine (typescript | python | java | c | cpp | go | rust | ruby | php | csharp). */
+export function langForPath(path: string): string {
+  if (path.endsWith(".py")) return "python";
+  if (path.endsWith(".java")) return "java";
+  if (path.endsWith(".c") || path.endsWith(".h")) return "c";
+  if (path.endsWith(".cc") || path.endsWith(".cpp") || path.endsWith(".cxx") || path.endsWith(".hpp") || path.endsWith(".hxx")) return "cpp";
+  if (path.endsWith(".go")) return "go";
+  if (path.endsWith(".rs")) return "rust";
+  if (path.endsWith(".rb")) return "ruby";
+  if (path.endsWith(".php")) return "php";
+  if (path.endsWith(".cs")) return "csharp";
+  return "typescript";
 }
 
 /** Apply engine DocEdits to a file's content, client-side (line-based). */

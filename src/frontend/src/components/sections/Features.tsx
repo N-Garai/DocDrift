@@ -16,15 +16,15 @@ const FEATURES = [
   {
     icon: ScanText,
     title: "AST, not vibes",
-    body: "web-tree-sitter WASM grammars parse TS, JS and Python for exported functions, classes, interfaces, routes and config keys. A structural fallback extractor keeps the engine alive when syntax gets exotic.",
+    body: "WASM grammars parse TS, JS and Python for exported functions, classes, interfaces, routes and config keys. A structural fallback extractor keeps the engine alive when syntax gets exotic.",
     span: "lg:col-span-2",
     accent: "text-drift-ember",
     chip: "border-drift-ember/30 bg-drift-ember/10",
   },
   {
     icon: Workflow,
-    title: "Mastra orchestration",
-    body: "Typed steps, zod schemas, a committed workflow graph — the same open-source harness powering production agents.",
+    title: "Agent orchestration",
+    body: "Typed steps, zod schemas, a committed workflow graph — an open-source harness powering production agents.",
     span: "",
     accent: "text-drift-amber",
     chip: "border-drift-amber/30 bg-drift-amber/10",
@@ -32,7 +32,7 @@ const FEATURES = [
   {
     icon: Gem,
     title: "Open weights inside",
-    body: "Gemma via Ollama on your machine, or the free Gemini API tier. Swap any OpenAI-compatible model with one env var.",
+    body: "Local inference on your machine, or a free API tier. Swap any compatible model with one env var.",
     span: "",
     accent: "text-drift-mint",
     chip: "border-drift-mint/30 bg-drift-mint/10",
@@ -56,7 +56,7 @@ const FEATURES = [
   {
     icon: Unplug,
     title: "Plugs into your flow",
-    body: "Pre-push hook, GitHub Action, CLI or the demo on this page. AST failures land in a queryable health ledger (bring-your-own Sentry DSN).",
+    body: "Pre-push hook, GitHub Action, CLI or the demo on this page. AST failures land in a queryable health ledger.",
     span: "lg:col-span-2",
     accent: "text-drift-mint",
     chip: "border-drift-mint/30 bg-drift-mint/10",

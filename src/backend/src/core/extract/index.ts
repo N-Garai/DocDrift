@@ -16,7 +16,7 @@ export interface ExtractResult {
 
 export async function extractSymbols(
   files: SourceFile[],
-  language: "typescript" | "python"
+  language: string
 ): Promise<ExtractResult> {
   const all: CodeSymbol[] = [];
   let tsCount = 0;
@@ -25,7 +25,7 @@ export async function extractSymbols(
 
   for (const file of files) {
     const isTsLike = /\.(ts|tsx|js|jsx|mjs|cjs)$/i.test(file.path);
-    const lang: "typescript" | "python" = isTsLike ? "typescript" : language;
+    const lang: "typescript" | "python" = isTsLike ? "typescript" : language.includes("python") ? "python" : "typescript";
     const viaTs = await extractWithTreeSitter(file, lang);
     if (viaTs && viaTs.length >= 0 && lastParserUsed === "tree-sitter") {
       all.push(...viaTs);

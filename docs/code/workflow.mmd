@@ -1,0 +1,64 @@
+flowchart TD
+    %% DocDrift — end-to-end workflow. Checked against src/backend/src and
+    %% src/frontend/src/components/studio. See docs/AGENT_WORKFLOW.md.
+
+    TRIG(["Trigger — a Studio run on a picked repo<br/>or a GitHub push event to POST /api/github/webhook"])
+
+    subgraph STAGE1["Stage 1 — Repository"]
+        R1["list repositories — GET /api/github/repos<br/>private included, archived filtered out"]
+        R2["pick a repo and an analyze branch<br/>default branch, or any of the 50 listed"]
+        R3["read the recursive file tree<br/>GET /api/github/repo/:owner/:repo/tree<br/>plus 15 recent commits with their touched files"]
+    end
+
+    subgraph STAGE2["Stage 2 — Files"]
+        F1["one primary code file — TS / JS / Python only"]
+        F2["up to 6 markdown doc files"]
+        F3["optional .env.example — the env-keys side<br/>handled separately from the markdown docs"]
+        F4["repo context — up to 8 extra code files the docs<br/>reference by path, fetched best effort"]
+        F5["POST /api/analyze (custom mode)<br/>JSON body capped at 512 KB, one file max 120 KB"]
+    end
+
+    subgraph STAGE3["Stage 3 — Mastra workflow · doc-drift-sync"]
+        S1["intake — normalize input, record the<br/>resolved engine and its reason"]
+        S2["extract — tree-sitter WASM AST over the code files,<br/>structural heuristic fallback when a grammar fails;<br/>failures land in the parser-failure ledger"]
+        S3["docs — parse the markdown and env targets"]
+        S4["synthesize — folding matcher aligns symbols to doc targets,<br/>8 deterministic drift rules run; with a provider, Gemma may add<br/>findings — any symbol missing from the AST is dropped"]
+        S5["gate-1 — every finding must trace to verbatim code evidence;<br/>ungrounded claims stay visible but marked unverified,<br/>and are excluded from patching"]
+        S6["patch — verified findings become concrete DocEdits;<br/>stale-doc-value gets no edit (needs human judgment)"]
+        S7["gate-2 — edits apply to a snapshot of the docs, the result<br/>re-parses, edits that break markdown tables are rejected<br/>before the diff is rendered"]
+        S8["tone — PR title + body rewritten by the ToneAgent,<br/>or the deterministic template offline"]
+        S9["emit — AnalyzeResult"]
+        S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7 --> S8 --> S9
+    end
+
+    subgraph STAGE4["Stage 4 — Drift report"]
+        D1["drift findings with line evidence on both sides —<br/>kinds: changed-default · missing-in-docs · renamed-symbol ·<br/>stale-doc-value · undocumented-env · env-default-mismatch ·<br/>route-missing-in-docs · route-stale-in-docs"]
+        D2["unified diff with stats<br/>files changed · additions · deletions"]
+        D3["PR title and body"]
+        D4["step trace + validation report + engine and parser badges<br/>run persisted via POST /api/history"]
+    end
+
+    subgraph STAGE5["Stage 5 — Pull request"]
+        P1["user picks the PR target branch (base)"]
+        P2["user names the working branch<br/>default: docdrift/docs-sync-*"]
+        P3["POST /api/github/repo/:owner/:repo/pr<br/>blobs → tree → commit → ref update → pull request"]
+        P4["user reviews and merges on GitHub<br/>nothing merges automatically"]
+    end
+
+    WEBHOOK["push-event path — the engine fetches changed<br/>source / doc / env files from the compare API,<br/>runs the same workflow and opens the docs PR itself<br/>with the repo owner's stored token"]
+
+    TRIG --> STAGE1
+    TRIG -. "push events" .-> WEBHOOK
+    WEBHOOK --> STAGE5
+    STAGE1 --> STAGE2
+    STAGE2 --> STAGE3
+    STAGE3 --> STAGE4
+    STAGE4 --> STAGE5
+
+    style TRIG fill:#2ea043,stroke:#2ea043,color:#fff
+    style STAGE1 fill:#161b22,stroke:#c9d1d9,stroke-width:1px,color:#e6edf3
+    style STAGE2 fill:#161b22,stroke:#c9d1d9,stroke-width:1px,color:#e6edf3
+    style STAGE3 fill:#161b22,stroke:#c9d1d9,stroke-width:1px,color:#e6edf3
+    style STAGE4 fill:#161b22,stroke:#c9d1d9,stroke-width:1px,color:#e6edf3
+    style STAGE5 fill:#161b22,stroke:#c9d1d9,stroke-width:1px,color:#e6edf3
+    style WEBHOOK fill:#161b22,stroke:#a371f7,stroke-width:1px,color:#e6edf3
